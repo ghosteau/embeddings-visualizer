@@ -1,0 +1,15 @@
+numpy
+pandas
+pytest
+umap-learn
+scikit-learn
+transformers
+hf_xet
+fastapi
+pydantic
+uvicorn
+python-multipart
+torch
+torchvision
+torchaudio
+accelerate

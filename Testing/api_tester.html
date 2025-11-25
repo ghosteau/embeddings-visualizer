@@ -1,0 +1,1728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vector Embedding Visualizer API Tester v0.2 - Fixed Export Metrics</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(45deg, #2c3e50, #3498db);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin-bottom: 5px;
+        }
+
+        .version-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .test-panel {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid #dee2e6;
+        }
+
+        .test-section {
+            margin-bottom: 25px;
+        }
+
+        .test-section h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #3498db;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .test-button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .test-button:hover {
+            background: #2980b9;
+            transform: translateY(-1px);
+        }
+
+        .test-button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .test-button.success {
+            background: #27ae60;
+        }
+
+        .test-button.error {
+            background: #e74c3c;
+        }
+
+        .test-button.warning {
+            background: #f39c12;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .response-panel {
+            height: 600px;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            border-left: 4px solid #3498db;
+        }
+
+        .log-entry.success {
+            background: #d4edda;
+            border-left-color: #28a745;
+            color: #155724;
+        }
+
+        .log-entry.error {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+            color: #721c24;
+        }
+
+        .log-entry.info {
+            background: #e2f3ff;
+            border-left-color: #007bff;
+            color: #004085;
+        }
+
+        .log-entry.warning {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+            color: #856404;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-indicator.online {
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.offline {
+            background: #dc3545;
+        }
+
+        .status-indicator.loading {
+            background: #ffc107;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .clear-button {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            float: right;
+        }
+
+        .model-status {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .model-status.loading {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+        }
+
+        .loading-progress {
+            margin-top: 10px;
+            font-style: italic;
+            color: #856404;
+        }
+
+        .quick-tests {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .model-type-tabs {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .model-tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .model-tab.active {
+            color: #3498db;
+            border-bottom-color: #3498db;
+        }
+
+        .model-tab:hover {
+            color: #2980b9;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .popular-models {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .model-card {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .model-card:hover {
+            border-color: #3498db;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .model-card.selected {
+            border-color: #27ae60;
+            background: #d4edda;
+        }
+
+        .model-card h4 {
+            margin: 0 0 5px 0;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+
+        .model-card p {
+            margin: 0;
+            color: #6c757d;
+            font-size: 12px;
+        }
+
+        .model-card .size-badge {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+            margin-top: 5px;
+            display: inline-block;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .loading-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            min-width: 300px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px auto;
+        }
+
+        .analysis-controls {
+            background: #f1f3f4;
+            border: 1px solid #e1e5e9;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 15px;
+            align-items: end;
+            margin-bottom: 10px;
+        }
+
+        .control-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-group {
+            flex: 1;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #495057;
+            font-weight: 600;
+        }
+
+        .control-group input, .control-group select {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .metric-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+
+        .metric-badge.euclidean {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .metric-badge.cosine {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .model-preview {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+
+        .timeout-warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 8px;
+            margin-top: 8px;
+            font-size: 12px;
+            color: #856404;
+        }
+
+        .feature-list {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .feature-list li {
+            margin-bottom: 3px;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .status-item {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+
+        .status-item h5 {
+            margin: 0 0 5px 0;
+            font-size: 12px;
+            color: #6c757d;
+        }
+
+        .status-item .value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .alert {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 13px;
+        }
+
+        .alert.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+
+        .alert.warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+
+        .comparison-tabs {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .comparison-tab {
+            padding: 8px 16px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: #666;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s;
+            font-size: 12px;
+        }
+
+        .comparison-tab.active {
+            color: #3498db;
+            border-bottom-color: #3498db;
+        }
+
+        .comparison-tab:hover {
+            color: #2980b9;
+        }
+
+        .comparison-content {
+            display: none;
+        }
+
+        .comparison-content.active {
+            display: block;
+        }
+
+        .new-feature-badge {
+            background: #28a745;
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        .dual-input-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .umap-only-badge {
+            background: #17a2b8;
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 8px;
+        }
+
+        .removed-feature {
+            text-decoration: line-through;
+            opacity: 0.5;
+            color: #6c757d;
+        }
+
+        .loading-error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+
+        .retry-controls {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .loading-attempts {
+            font-size: 11px;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .export-controls {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .export-metric-display {
+            background: #e9ecef;
+            padding: 8px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            text-align: center;
+            border: 2px dashed #6c757d;
+        }
+
+        .export-metric-display.euclidean {
+            background: #e3f2fd;
+            border-color: #1976d2;
+            color: #1976d2;
+        }
+
+        .export-metric-display.cosine {
+            background: #f3e5f5;
+            border-color: #7b1fa2;
+            color: #7b1fa2;
+        }
+
+        .fixed-badge {
+            background: #dc3545;
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 8px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <h3 id="loading-text">Processing...</h3>
+            <p id="loading-subtitle">Please wait</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1>Vector Embedding Visualizer API Tester
+                <span class="version-badge">v0.2 - Export Metrics Fixed</span>
+            </h1>
+            <p>Testing interface with proper export metric selection and improved UX</p>
+        </div>
+
+        <div class="content">
+            <!-- Left Panel - Controls -->
+            <div class="test-panel">
+                <div class="model-status" id="model-status-panel">
+                    <div class="status-grid">
+                        <div class="status-item">
+                            <h5>Server Status</h5>
+                            <div class="value">
+                                <span id="status-indicator" class="status-indicator offline"></span>
+                                <span id="server-status">Checking...</span>
+                            </div>
+                        </div>
+                        <div class="status-item">
+                            <h5>Current Model</h5>
+                            <div class="value" id="current-model">None</div>
+                        </div>
+                        <div class="status-item">
+                            <h5>Tokens Loaded</h5>
+                            <div class="value" id="tokens-loaded">0</div>
+                        </div>
+                        <div class="status-item">
+                            <h5>Embedding Dim</h5>
+                            <div class="value" id="embedding-dim">0</div>
+                        </div>
+                    </div>
+                    <div id="loading-status" style="display: none;">
+                        <div class="loading-progress" id="loading-progress-text">Loading model...</div>
+                        <div class="timeout-warning">
+                            Model loading will timeout after 2 minutes with proper cancellation
+                        </div>
+                        <div class="loading-attempts" id="loading-attempts">Loading status checks: 0</div>
+                    </div>
+                    <div id="loading-error" class="loading-error" style="display: none;">
+                        <strong>Loading Status Error:</strong><br>
+                        <span id="loading-error-message">Unable to get loading status</span>
+                        <div class="retry-controls">
+                            <button class="test-button" onclick="retryLoadingStatus()" id="retry-loading-btn">Retry Status Check</button>
+                            <span class="loading-attempts" id="status-retry-count">Retries: 0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert info">
+                    <strong>Version 0.2 Export Metrics Fixed:</strong>
+                    <ul class="announcement-board">
+                        <li><strong>NOTE:</strong> This is a 0.2 version of the testing interface for the backend API. </li>
+                    </ul>
+                </div>
+
+                <div class="test-section">
+                    <h3>Basic Tests</h3>
+                    <div class="quick-tests">
+                        <button class="test-button" onclick="testConnectivity()">Health Check</button>
+                        <button class="test-button" onclick="getAvailableModels()">List Models</button>
+                        <button class="test-button" onclick="getModelInfo()">Model Info</button>
+                        <button class="test-button" onclick="getLoadingStatus()">Loading Status</button>
+                    </div>
+                </div>
+
+                <div class="test-section">
+                    <h3>Model Management</h3>
+
+                    <div class="model-type-tabs">
+                        <button class="model-tab active" onclick="switchTab('preset')">Preset Models</button>
+                        <button class="model-tab" onclick="switchTab('huggingface')">Hugging Face</button>
+                    </div>
+
+                    <!-- Preset Models Tab -->
+                    <div id="preset-tab" class="tab-content active">
+                        <div class="popular-models" id="preset-models">
+                            <div class="model-card" onclick="selectPresetModel('distilgpt2')">
+                                <h4>DistilGPT-2</h4>
+                                <p>Fast, lightweight GPT-2</p>
+                                <span class="size-badge">82M</span>
+                            </div>
+                            <div class="model-card" onclick="selectPresetModel('gpt2')">
+                                <h4>GPT-2</h4>
+                                <p>Original GPT-2 small</p>
+                                <span class="size-badge">124M</span>
+                            </div>
+                            <div class="model-card" onclick="selectPresetModel('bert-base-uncased')">
+                                <h4>BERT Base</h4>
+                                <p>BERT base uncased</p>
+                                <span class="size-badge">110M</span>
+                            </div>
+                            <div class="model-card" onclick="selectPresetModel('distilbert-base-uncased')">
+                                <h4>DistilBERT</h4>
+                                <p>Lightweight BERT</p>
+                                <span class="size-badge">66M</span>
+                            </div>
+                            <div class="model-card" onclick="selectPresetModel('roberta-base')">
+                                <h4>RoBERTa Base</h4>
+                                <p>Robustly optimized BERT</p>
+                                <span class="size-badge">125M</span>
+                            </div>
+                            <div class="model-card" onclick="selectPresetModel('gpt2-medium')">
+                                <h4>GPT-2 Medium</h4>
+                                <p>Larger GPT-2 model</p>
+                                <span class="size-badge">355M</span>
+                            </div>
+                        </div>
+                        <input type="hidden" id="selected-preset-model" value="distilgpt2">
+                        <div style="margin-top: 15px;">
+                            <button class="test-button" onclick="loadPresetModel()" id="load-preset-btn">Load Selected Model</button>
+                        </div>
+                    </div>
+
+                    <!-- Hugging Face Models Tab -->
+                    <div id="huggingface-tab" class="tab-content">
+                        <div class="input-group">
+                            <label>Model Name/Path:</label>
+                            <input type="text" id="hf-model-name" placeholder="e.g., microsoft/DialoGPT-medium, openai-gpt, etc.">
+                        </div>
+                        <div class="model-preview" id="hf-model-preview">
+                            Enter a Hugging Face model name above. Popular models:
+                            <br>• microsoft/DialoGPT-medium
+                            <br>• openai-gpt
+                            <br>• allenai/scibert_scivocab_uncased
+                            <br>• sentence-transformers/all-MiniLM-L6-v2
+                        </div>
+                        <div class="timeout-warning">
+                            Model loading will timeout after 2 minutes with proper cancellation
+                        </div>
+                        <div style="margin-top: 15px;">
+                            <button class="test-button" onclick="checkHFModelCompatibility()">Check Compatibility</button>
+                            <button class="test-button" onclick="loadHuggingFaceModel()" id="load-hf-btn">Load HF Model</button>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 20px; border-top: 1px solid #dee2e6; padding-top: 15px;">
+                        <button class="test-button error" onclick="unloadModel()" id="unload-btn">Unload Current Model</button>
+                    </div>
+                </div>
+
+                <div class="test-section">
+                    <h3>Visualization <span class="umap-only-badge">UMAP Only</span></h3>
+                    <div class="input-group">
+                        <label>Top N Tokens:</label>
+                        <input type="number" id="top-n" value="500" min="10" max="10000">
+                    </div>
+                    <div class="input-group">
+                        <label>Method:</label>
+                        <select id="viz-method" disabled>
+                            <option value="umap">UMAP (Only Available)</option>
+                            <option value="pca" class="removed-feature" disabled>PCA (Removed)</option>
+                        </select>
+                    </div>
+                    <div class="timeout-warning">
+                        <strong>Note:</strong> PCA has been removed for reliability. UMAP provides superior visualization results.
+                    </div>
+                    <button class="test-button" onclick="createVisualization()" id="create-viz-btn">Create UMAP Visualization</button>
+                </div>
+
+                <div class="test-section">
+                    <h3>Token Analysis</h3>
+
+                    <div class="analysis-controls">
+                        <div class="control-row">
+                            <div class="control-group">
+                                <label>Token Index:</label>
+                                <input type="number" id="token-index" value="0" min="0">
+                            </div>
+                            <div class="control-group">
+                                <label>Distance Metric:</label>
+                                <select id="distance-metric">
+                                    <option value="euclidean">Euclidean</option>
+                                    <option value="cosine">Cosine</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="control-row">
+                            <div class="control-group">
+                                <label>Search Query:</label>
+                                <input type="text" id="search-query" value="the" placeholder="Enter token to search">
+                            </div>
+                            <div class="control-group">
+                                <label>Neighbors Count:</label>
+                                <input type="number" id="neighbors-count" value="10" min="1" max="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="quick-tests">
+                        <button class="test-button" onclick="getTokenDetails()" id="token-details-btn">
+                            Token Details
+                            <span class="metric-badge" id="details-metric-badge">euclidean</span>
+                        </button>
+                        <button class="test-button" onclick="getTokenNeighbors()" id="token-neighbors-btn">
+                            Get Neighbors
+                            <span class="metric-badge" id="neighbors-metric-badge">euclidean</span>
+                        </button>
+                        <button class="test-button" onclick="searchTokens()" id="search-tokens-btn">Search Tokens</button>
+                        <button class="test-button" onclick="getStatistics()" id="statistics-btn">Statistics</button>
+                    </div>
+                </div>
+
+                <div class="test-section">
+                    <h3>Comparison <span class="new-feature-badge">NEW: ID Support</span></h3>
+
+                    <div class="comparison-tabs">
+                        <button class="comparison-tab active" onclick="switchComparisonTab('name')">By Name</button>
+                        <button class="comparison-tab" onclick="switchComparisonTab('id')">By ID</button>
+                    </div>
+
+                    <!-- Name-based comparison -->
+                    <div id="name-comparison" class="comparison-content active">
+                        <div class="input-group">
+                            <label>Token 1:</label>
+                            <input type="text" id="compare-token1" value="the" placeholder="First token name">
+                        </div>
+                        <div class="input-group">
+                            <label>Token 2:</label>
+                            <input type="text" id="compare-token2" value="and" placeholder="Second token name">
+                        </div>
+                        <button class="test-button" onclick="compareTokens()" id="compare-btn">Compare Tokens by Name</button>
+                    </div>
+
+                    <!-- ID-based comparison -->
+                    <div id="id-comparison" class="comparison-content">
+                        <div class="dual-input-row">
+                            <div class="input-group">
+                                <label>Token 1 Index:</label>
+                                <input type="number" id="compare-token1-id" value="0" min="0" placeholder="First token index">
+                            </div>
+                            <div class="input-group">
+                                <label>Token 2 Index:</label>
+                                <input type="number" id="compare-token2-id" value="1" min="0" placeholder="Second token index">
+                            </div>
+                        </div>
+                        <div class="timeout-warning" style="margin-bottom: 10px;">
+                            <strong>ID-based comparison:</strong> Compare tokens directly by their indices.
+                            Useful when dealing with duplicate tokens or specific vocabulary positions.
+                        </div>
+                        <button class="test-button" onclick="compareTokensById()" id="compare-id-btn">Compare Tokens by ID</button>
+                    </div>
+                </div>
+
+                <div class="test-section">
+                    <h3>Export & Utilities <span class="fixed-badge">METRICS FIXED</span></h3>
+
+                    <div class="export-controls">
+                        <div class="export-metric-display" id="export-metric-display">
+                            <strong>Export Metric:</strong> <span id="export-metric-text">euclidean</span>
+                            <br><small>Exports will use this distance metric for calculations and filenames</small>
+                        </div>
+                        <div class="timeout-warning">
+                            <strong>FIXED:</strong> Export functions now properly use the selected distance metric above.
+                            Filenames will include the metric type for clarity.
+                        </div>
+                    </div>
+
+                    <div class="quick-tests">
+                        <button class="test-button" onclick="exportToken()" id="export-token-btn">
+                            Export Token
+                            <span class="metric-badge" id="export-token-metric-badge">euclidean</span>
+                        </button>
+                        <button class="test-button" onclick="exportMetadata()" id="export-metadata-btn">
+                            Export Metadata
+                            <span class="metric-badge" id="export-metadata-metric-badge">euclidean</span>
+                        </button>
+                        <button class="test-button" onclick="listExports()">List Exports</button>
+                        <button class="test-button" onclick="cleanupFiles()">Cleanup Files</button>
+                    </div>
+                </div>
+
+                <div class="test-section">
+                    <h3>Debug & Testing</h3>
+                    <div class="input-group">
+                        <label>Debug Token Indices:</label>
+                        <div class="dual-input-row">
+                            <input type="number" id="debug-token1" value="0" min="0" placeholder="Token 1 index">
+                            <input type="number" id="debug-token2" value="1" min="0" placeholder="Token 2 index">
+                        </div>
+                    </div>
+                    <button class="test-button warning" onclick="debugTokenComparison()" id="debug-btn">Debug Comparison Consistency</button>
+                </div>
+            </div>
+
+            <!-- Right Panel - Response Log -->
+            <div class="test-panel">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3>Response Log</h3>
+                    <button class="clear-button" onclick="clearLog()">Clear Log</button>
+                </div>
+                <div id="response-log" class="response-panel">
+                    <div class="log-entry info">
+                        <strong>API Tester Interface v0.2</strong><br>
+                        Make sure your API server is running on http://localhost:8000<br><br>
+                        <strong>Patch Notes:</strong><br>
+                        • Cleaned up code structure and removed redundancies
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:8000';
+        let loadingStatusInterval = null;
+        let loadingTimeoutId = null;
+        let loadingStatusAttempts = 0;
+        let statusRetryCount = 0;
+        let maxLoadingStatusAttempts = 30; // Limit to prevent spam
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('response-log');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('response-log').innerHTML = '';
+            log('Log cleared', 'info');
+        }
+
+        function showLoading(text = 'Loading...', subtitle = 'Please wait') {
+            document.getElementById('loading-text').textContent = text;
+            document.getElementById('loading-subtitle').textContent = subtitle;
+            document.getElementById('loading-overlay').style.display = 'flex';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading-overlay').style.display = 'none';
+        }
+
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.model-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabName + '-tab').classList.add('active');
+        }
+
+        function switchComparisonTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.comparison-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.comparison-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabName + '-comparison').classList.add('active');
+        }
+
+        function selectPresetModel(modelName) {
+            // Update UI
+            document.querySelectorAll('#preset-models .model-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            event.target.classList.add('selected');
+            document.getElementById('selected-preset-model').value = modelName;
+            log(`Selected preset model: ${modelName}`, 'info');
+        }
+
+        function updateMetricBadges() {
+            const metric = document.getElementById('distance-metric').value;
+
+            // Update all metric badges
+            const badges = [
+                'neighbors-metric-badge',
+                'details-metric-badge',
+                'export-token-metric-badge',
+                'export-metadata-metric-badge'
+            ];
+
+            badges.forEach(badgeId => {
+                const badge = document.getElementById(badgeId);
+                if (badge) {
+                    badge.textContent = metric;
+                    badge.className = `metric-badge ${metric}`;
+                }
+            });
+
+            // Update export metric display
+            const exportDisplay = document.getElementById('export-metric-display');
+            const exportText = document.getElementById('export-metric-text');
+            if (exportDisplay && exportText) {
+                exportDisplay.className = `export-metric-display ${metric}`;
+                exportText.textContent = metric;
+            }
+        }
+
+        function updateButtonStates(isLoading = false, hasModel = false) {
+            const loadButtons = ['load-preset-btn', 'load-hf-btn'];
+            const modelDependentButtons = [
+                'create-viz-btn', 'token-details-btn', 'token-neighbors-btn',
+                'search-tokens-btn', 'statistics-btn', 'compare-btn', 'compare-id-btn',
+                'export-token-btn', 'export-metadata-btn', 'debug-btn'
+            ];
+
+            loadButtons.forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.disabled = isLoading;
+            });
+
+            modelDependentButtons.forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) btn.disabled = isLoading || !hasModel;
+            });
+
+            const unloadBtn = document.getElementById('unload-btn');
+            if (unloadBtn) unloadBtn.disabled = isLoading || !hasModel;
+        }
+
+        function showLoadingError(message) {
+            document.getElementById('loading-error-message').textContent = message;
+            document.getElementById('loading-error').style.display = 'block';
+            document.getElementById('status-retry-count').textContent = `Retries: ${statusRetryCount}`;
+        }
+
+        function hideLoadingError() {
+            document.getElementById('loading-error').style.display = 'none';
+        }
+
+        function retryLoadingStatus() {
+            statusRetryCount++;
+            hideLoadingError();
+            startLoadingStatusPolling();
+        }
+
+        function startLoadingStatusPolling() {
+            if (loadingStatusInterval) {
+                clearInterval(loadingStatusInterval);
+            }
+
+            // Reset attempt counter
+            loadingStatusAttempts = 0;
+            hideLoadingError();
+
+            // Set up 2-minute timeout
+            if (loadingTimeoutId) {
+                clearTimeout(loadingTimeoutId);
+            }
+
+            loadingTimeoutId = setTimeout(() => {
+                log('Model loading timed out after 2 minutes. Loading has been cancelled.', 'error');
+                stopLoadingStatusPolling();
+                updateButtonStates(false, false);
+            }, 120000); // 2 minutes
+
+            loadingStatusInterval = setInterval(async () => {
+                loadingStatusAttempts++;
+                document.getElementById('loading-attempts').textContent = `Loading status checks: ${loadingStatusAttempts}`;
+
+                // Limit attempts to prevent spam
+                if (loadingStatusAttempts > maxLoadingStatusAttempts) {
+                    log('Maximum loading status attempts reached. Stopping polling to prevent spam.', 'warning');
+                    stopLoadingStatusPolling();
+                    showLoadingError('Too many failed attempts. Click retry to check again.');
+                    updateButtonStates(false, false);
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`${BASE_URL}/models/loading-status`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        // Add timeout to prevent hanging
+                        signal: AbortSignal.timeout(5000) // 5 second timeout
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+
+                    const status = await response.json();
+
+                    if (status.is_loading) {
+                        // Show loading status
+                        document.getElementById('model-status-panel').classList.add('loading');
+                        document.getElementById('loading-status').style.display = 'block';
+                        document.getElementById('loading-progress-text').textContent =
+                            `Loading ${status.model_name || 'model'}: ${status.progress || 'Processing...'}`;
+
+                        document.getElementById('status-indicator').className = 'status-indicator loading';
+                        updateButtonStates(true, false);
+                        hideLoadingError();
+                    } else {
+                        // Hide loading status and clear timeout
+                        document.getElementById('model-status-panel').classList.remove('loading');
+                        document.getElementById('loading-status').style.display = 'none';
+
+                        stopLoadingStatusPolling();
+
+                        // Check for error
+                        if (status.error) {
+                            log(`Model loading failed: ${status.error}`, 'error');
+                            updateButtonStates(false, false);
+                        } else {
+                            // Update model info
+                            await getModelInfo();
+                        }
+                    }
+                } catch (error) {
+                    // Handle specific error types
+                    if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+                        if (loadingStatusAttempts <= 3) {
+                            log(`Loading status check timed out (attempt ${loadingStatusAttempts})`, 'warning');
+                        }
+                    } else if (loadingStatusAttempts <= 3) {
+                        // Only log first few network errors to prevent spam
+                        log(`Loading status check failed (attempt ${loadingStatusAttempts}): ${error.message}`, 'warning');
+                    }
+
+                    // Show error UI after multiple failures
+                    if (loadingStatusAttempts > 5) {
+                        showLoadingError(`Failed to get loading status: ${error.message}`);
+                        document.getElementById('model-status-panel').classList.remove('loading');
+                        document.getElementById('loading-status').style.display = 'none';
+                    }
+                }
+            }, 3000); // Poll every 3 seconds
+        }
+
+        function stopLoadingStatusPolling() {
+            if (loadingStatusInterval) {
+                clearInterval(loadingStatusInterval);
+                loadingStatusInterval = null;
+            }
+            if (loadingTimeoutId) {
+                clearTimeout(loadingTimeoutId);
+                loadingTimeoutId = null;
+            }
+            loadingStatusAttempts = 0;
+        }
+
+        async function makeRequest(method, endpoint, data = null) {
+            const url = `${BASE_URL}${endpoint}`;
+            log(`${method} ${endpoint}...`, 'info');
+
+            try {
+                const config = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    // Add timeout to prevent hanging
+                    signal: AbortSignal.timeout(30000) // 30 second timeout
+                };
+
+                if (data && method !== 'GET') {
+                    config.body = JSON.stringify(data);
+                }
+
+                const response = await fetch(url, config);
+                const result = await response.json();
+
+                if (response.ok) {
+                    const displayResult = JSON.stringify(result, null, 2);
+                    const truncated = displayResult.length > 1500 ? displayResult.slice(0, 1500) + '\n...[truncated]' : displayResult;
+                    log(`Success ${method} ${endpoint}:<br><pre>${truncated}</pre>`, 'success');
+                    return result;
+                } else {
+                    log(`Error ${method} ${endpoint}: ${response.status}<br><pre>${JSON.stringify(result, null, 2)}</pre>`, 'error');
+                    return null;
+                }
+            } catch (error) {
+                if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+                    log(`Timeout ${method} ${endpoint}: Request timed out after 30 seconds`, 'error');
+                } else {
+                    log(`Network Error ${method} ${endpoint}:<br>${error.message}`, 'error');
+                }
+                return null;
+            }
+        }
+
+        async function testConnectivity() {
+            const result = await makeRequest('GET', '/health');
+            if (result) {
+                document.getElementById('status-indicator').className = 'status-indicator online';
+                document.getElementById('server-status').textContent = 'Online';
+
+                // Update loading status if applicable
+                if (result.loading_status && result.loading_status.is_loading) {
+                    startLoadingStatusPolling();
+                }
+            } else {
+                document.getElementById('status-indicator').className = 'status-indicator offline';
+                document.getElementById('server-status').textContent = 'Offline';
+            }
+        }
+
+        async function getAvailableModels() {
+            await makeRequest('GET', '/models/available');
+        }
+
+        async function getModelInfo() {
+            const result = await makeRequest('GET', '/models/info');
+            if (result) {
+                document.getElementById('current-model').textContent = result.name || 'None';
+                document.getElementById('tokens-loaded').textContent = result.token_count || '0';
+                document.getElementById('embedding-dim').textContent = result.embedding_dimension || '0';
+
+                updateButtonStates(
+                    result.loading_status?.is_loading || false,
+                    result.is_loaded || false
+                );
+
+                if (result.loading_status?.is_loading) {
+                    startLoadingStatusPolling();
+                }
+            }
+        }
+
+        async function getLoadingStatus() {
+            const result = await makeRequest('GET', '/models/loading-status');
+            if (result && result.is_loading) {
+                startLoadingStatusPolling();
+            }
+        }
+
+        async function loadPresetModel() {
+            const modelName = document.getElementById('selected-preset-model').value;
+
+            if (!modelName) {
+                log('No model selected', 'error');
+                return;
+            }
+
+            log(`Starting to load model: ${modelName} (2-minute timeout with cancellation)`, 'info');
+            updateButtonStates(true, false);
+            statusRetryCount = 0; // Reset retry count
+
+            try {
+                const result = await makeRequest('POST', '/models/load', {
+                    model_name: modelName
+                });
+
+                if (result && result.success) {
+                    log(`Model loading started: ${modelName}`, 'success');
+                    startLoadingStatusPolling();
+                } else {
+                    updateButtonStates(false, false);
+                }
+            } catch (error) {
+                updateButtonStates(false, false);
+                log(`Failed to start model loading: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadHuggingFaceModel() {
+            const modelName = document.getElementById('hf-model-name').value.trim();
+
+            if (!modelName) {
+                log('Please enter a Hugging Face model name', 'error');
+                return;
+            }
+
+            log(`Starting to load HF model: ${modelName} (2-minute timeout with cancellation)`, 'info');
+            updateButtonStates(true, false);
+            statusRetryCount = 0; // Reset retry count
+
+            try {
+                const result = await makeRequest('POST', '/models/load', {
+                    model_name: modelName
+                });
+
+                if (result && result.success) {
+                    log(`HF model loading started: ${modelName}`, 'success');
+                    startLoadingStatusPolling();
+                } else {
+                    updateButtonStates(false, false);
+                }
+            } catch (error) {
+                updateButtonStates(false, false);
+                log(`Failed to start HF model loading: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkHFModelCompatibility() {
+            const modelName = document.getElementById('hf-model-name').value.trim();
+
+            if (!modelName) {
+                log('Please enter a Hugging Face model name', 'error');
+                return;
+            }
+
+            const result = await makeRequest('GET', `/utils/model-compatibility?model_name=${encodeURIComponent(modelName)}`);
+
+            if (result) {
+                if (result.compatible) {
+                    log(`Model ${modelName} is compatible!<br>Tokenizer: ${result.tokenizer_type}<br>Vocab Size: ${result.vocab_size || 'Unknown'}`, 'success');
+                } else {
+                    log(`Model ${modelName} is not compatible:<br>${result.error}`, 'error');
+                }
+            }
+        }
+
+        async function unloadModel() {
+            const result = await makeRequest('DELETE', '/models/unload');
+            if (result) {
+                stopLoadingStatusPolling();
+                updateButtonStates(false, false);
+                await getModelInfo();
+                log('Model unloaded successfully', 'success');
+            }
+        }
+
+        async function createVisualization() {
+            const topN = parseInt(document.getElementById('top-n').value);
+            // Force UMAP method since PCA is removed
+            const method = 'umap';
+
+            if (topN < 10 || topN > 10000) {
+                log('Top N must be between 10 and 10,000', 'error');
+                return;
+            }
+
+            log(`Creating UMAP visualization with ${topN} tokens...`, 'info');
+
+            showLoading(`Creating UMAP visualization...`, `Processing ${topN} tokens - this may take a moment`);
+
+            try {
+                await makeRequest('POST', '/visualization/create', {
+                    method: method,
+                    n_components: 3,
+                    top_n: topN,
+                    n_neighbors: 15,
+                    min_dist: 0.1,
+                    metric: 'cosine'
+                });
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function getTokenDetails() {
+            const tokenIndex = parseInt(document.getElementById('token-index').value);
+            const metric = document.getElementById('distance-metric').value;
+
+            if (tokenIndex < 0) {
+                log('Token index must be non-negative', 'error');
+                return;
+            }
+
+            await makeRequest('GET', `/tokens/${tokenIndex}?include_distances=true&metric=${metric}`);
+        }
+
+        async function getTokenNeighbors() {
+            const tokenIndex = parseInt(document.getElementById('token-index').value);
+            const metric = document.getElementById('distance-metric').value;
+            const nNeighbors = parseInt(document.getElementById('neighbors-count').value);
+
+            if (tokenIndex < 0) {
+                log('Token index must be non-negative', 'error');
+                return;
+            }
+
+            if (nNeighbors < 1 || nNeighbors > 100) {
+                log('Neighbors count must be between 1 and 100', 'error');
+                return;
+            }
+
+            await makeRequest('GET', `/tokens/${tokenIndex}/neighbors?n_neighbors=${nNeighbors}&metric=${metric}`);
+        }
+
+        async function searchTokens() {
+            const query = document.getElementById('search-query').value.trim();
+            if (!query) {
+                log('Please enter a search query', 'error');
+                return;
+            }
+            await makeRequest('GET', `/search?query=${encodeURIComponent(query)}&max_results=20`);
+        }
+
+        async function compareTokens() {
+            const token1 = document.getElementById('compare-token1').value.trim();
+            const token2 = document.getElementById('compare-token2').value.trim();
+
+            if (!token1 || !token2) {
+                log('Please enter both tokens to compare', 'error');
+                return;
+            }
+
+            log(`Comparing tokens by name: "${token1}" vs "${token2}"`, 'info');
+            await makeRequest('POST', '/compare', {
+                token1: token1,
+                token2: token2
+            });
+        }
+
+        async function compareTokensById() {
+            const token1Index = parseInt(document.getElementById('compare-token1-id').value);
+            const token2Index = parseInt(document.getElementById('compare-token2-id').value);
+
+            if (token1Index < 0 || token2Index < 0) {
+                log('Token indices must be non-negative', 'error');
+                return;
+            }
+
+            if (isNaN(token1Index) || isNaN(token2Index)) {
+                log('Please enter valid token indices', 'error');
+                return;
+            }
+
+            log(`Comparing tokens by ID: Index ${token1Index} vs Index ${token2Index}`, 'info');
+            await makeRequest('POST', '/compare/by-id', {
+                token1_index: token1Index,
+                token2_index: token2Index
+            });
+        }
+
+        async function getStatistics() {
+            await makeRequest('GET', '/analysis/statistics');
+        }
+
+        // FIXED: Export functions now use the chosen distance metric
+        async function exportToken() {
+            const tokenIndex = parseInt(document.getElementById('token-index').value);
+            const nNeighbors = parseInt(document.getElementById('neighbors-count').value);
+            const metric = document.getElementById('distance-metric').value; // FIXED: Get the selected metric
+
+            if (tokenIndex < 0) {
+                log('Token index must be non-negative', 'error');
+                return;
+            }
+
+            if (nNeighbors < 1 || nNeighbors > 100) {
+                log('Neighbors count must be between 1 and 100', 'error');
+                return;
+            }
+
+            log(`Exporting token ${tokenIndex} with ${nNeighbors} neighbors using ${metric} metric...`, 'info');
+
+            try {
+                // FIXED: Pass the metric parameter to the API
+                const response = await fetch(`${BASE_URL}/export/token?metric=${metric}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        token_index: tokenIndex,
+                        include_neighbors: true,
+                        n_neighbors: nNeighbors
+                    })
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+
+                    // FIXED: Filename will now include the metric from the backend
+                    const contentDisposition = response.headers.get('content-disposition');
+                    const filename = contentDisposition
+                        ? contentDisposition.split('filename=')[1]?.replace(/"/g, '')
+                        : `token_export_${tokenIndex}_${metric}.json`;
+
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    log(`Token ${tokenIndex} exported with ${nNeighbors} neighbors using ${metric} metric and downloaded`, 'success');
+                } else {
+                    const result = await response.json();
+                    log(`Export failed: ${response.status} - ${result.detail || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                log(`Export error: ${error.message}`, 'error');
+            }
+        }
+
+        // FIXED: Export metadata now uses the chosen distance metric
+        async function exportMetadata() {
+            const metric = document.getElementById('distance-metric').value; // FIXED: Get the selected metric
+
+            log(`Exporting metadata using ${metric} metric...`, 'info');
+
+            try {
+                // FIXED: Pass the metric parameter to the API
+                const response = await fetch(`${BASE_URL}/export/metadata?metric=${metric}`);
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+
+                    // FIXED: Filename will now include the metric from the backend
+                    const contentDisposition = response.headers.get('content-disposition');
+                    const filename = contentDisposition
+                        ? contentDisposition.split('filename=')[1]?.replace(/"/g, '')
+                        : `token_metadata_${metric}.csv`;
+
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    log(`Metadata exported using ${metric} metric and downloaded`, 'success');
+                } else {
+                    const result = await response.json();
+                    log(`Metadata export failed: ${response.status} - ${result.detail || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                log(`Metadata export error: ${error.message}`, 'error');
+            }
+        }
+
+        async function listExports() {
+            await makeRequest('GET', '/files/exports');
+        }
+
+        async function cleanupFiles() {
+            const result = await makeRequest('DELETE', '/files/cleanup?older_than_hours=1');
+            if (result) {
+                log(`Cleaned up ${result.count} old files (checked ${result.total_checked} total files)`, 'success');
+            }
+        }
+
+        async function debugTokenComparison() {
+            const token1Index = parseInt(document.getElementById('debug-token1').value);
+            const token2Index = parseInt(document.getElementById('debug-token2').value);
+
+            if (token1Index < 0 || token2Index < 0) {
+                log('Token indices must be non-negative', 'error');
+                return;
+            }
+
+            if (isNaN(token1Index) || isNaN(token2Index)) {
+                log('Please enter valid token indices for debug', 'error');
+                return;
+            }
+
+            log(`Running debug comparison for tokens ${token1Index} and ${token2Index}...`, 'info');
+            await makeRequest('GET', `/debug/token-comparison/${token1Index}/${token2Index}`);
+        }
+
+        // Enhanced HF model preview
+        function updateHFModelPreview() {
+            const modelName = document.getElementById('hf-model-name').value.trim();
+            const preview = document.getElementById('hf-model-preview');
+
+            if (modelName) {
+                preview.innerHTML = `
+                    <strong>Model:</strong> ${modelName}<br>
+                    <strong>Source:</strong> Hugging Face Hub<br>
+                    <strong>Status:</strong> Ready to load<br>
+                    <em>Click "Check Compatibility" to verify before loading</em>
+                `;
+            } else {
+                preview.innerHTML = `
+                    Enter a Hugging Face model name above. Popular models:
+                    <br>• microsoft/DialoGPT-medium
+                    <br>• openai-gpt
+                    <br>• allenai/scibert_scivocab_uncased
+                    <br>• sentence-transformers/all-MiniLM-L6-v2
+                `;
+            }
+        }
+
+        // Add popular HF models
+        function addPopularHFModels() {
+            const popularModels = [
+                { name: 'microsoft/DialoGPT-medium', desc: 'Conversational GPT', size: '355M' },
+                { name: 'openai-gpt', desc: 'Original OpenAI GPT', size: '117M' },
+                { name: 'allenai/scibert_scivocab_uncased', desc: 'Scientific BERT', size: '110M' },
+                { name: 'sentence-transformers/all-MiniLM-L6-v2', desc: 'Sentence embeddings', size: '23M' },
+                { name: 'facebook/bart-base', desc: 'BART base model', size: '140M' },
+                { name: 'roberta-base', desc: 'RoBERTa base', size: '125M' }
+            ];
+
+            const hfTab = document.getElementById('huggingface-tab');
+            const modelGrid = document.createElement('div');
+            modelGrid.className = 'popular-models';
+            modelGrid.style.marginTop = '15px';
+
+            popularModels.forEach(model => {
+                const card = document.createElement('div');
+                card.className = 'model-card';
+                card.innerHTML = `
+                    <h4>${model.name.split('/').pop()}</h4>
+                    <p>${model.desc}</p>
+                    <span class="size-badge">${model.size}</span>
+                `;
+                card.onclick = () => {
+                    document.getElementById('hf-model-name').value = model.name;
+                    updateHFModelPreview();
+                    // Remove selection from other cards
+                    modelGrid.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                };
+                modelGrid.appendChild(card);
+            });
+
+            // Add after the model preview
+            const preview = document.getElementById('hf-model-preview');
+            preview.parentNode.insertBefore(modelGrid, preview.nextSibling);
+        }
+
+        // Validation helpers
+        function validateInputs() {
+            const tokenIndex = document.getElementById('token-index').value;
+            const neighborsCount = document.getElementById('neighbors-count').value;
+            const topN = document.getElementById('top-n').value;
+
+            // Update input validation styles
+            document.getElementById('token-index').style.borderColor =
+                tokenIndex >= 0 ? '#ced4da' : '#e74c3c';
+            document.getElementById('neighbors-count').style.borderColor =
+                neighborsCount >= 1 && neighborsCount <= 100 ? '#ced4da' : '#e74c3c';
+            document.getElementById('top-n').style.borderColor =
+                topN >= 10 && topN <= 10000 ? '#ced4da' : '#e74c3c';
+        }
+
+        // Keyboard shortcuts
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    switch(e.key) {
+                        case 'h':
+                            e.preventDefault();
+                            testConnectivity();
+                            break;
+                        case 'i':
+                            e.preventDefault();
+                            getModelInfo();
+                            break;
+                        case 'l':
+                            e.preventDefault();
+                            clearLog();
+                            break;
+                    }
+                }
+            });
+        }
+
+        // Auto-refresh and initialization
+        function initializeInterface() {
+            // Add HF model input listener
+            document.getElementById('hf-model-name').addEventListener('input', updateHFModelPreview);
+
+            // Add distance metric change listener
+            document.getElementById('distance-metric').addEventListener('change', updateMetricBadges);
+
+            // Add input validation listeners
+            ['token-index', 'neighbors-count', 'top-n'].forEach(id => {
+                document.getElementById(id).addEventListener('input', validateInputs);
+            });
+
+            // Add popular HF models
+            addPopularHFModels();
+
+            // Initialize metric badges
+            updateMetricBadges();
+
+            // Setup keyboard shortcuts
+            setupKeyboardShortcuts();
+
+            // Initial connectivity test
+            log('API Tester v0.2 Export Metrics Fixed initialized. Testing connection...', 'info');
+            setTimeout(testConnectivity, 500);
+
+            // Auto-refresh status every 30 seconds (only when not loading)
+            setInterval(() => {
+                if (!loadingStatusInterval) {
+                    testConnectivity();
+                }
+            }, 30000);
+
+            // Initialize button states
+            updateButtonStates(false, false);
+
+            log('Keyboard shortcuts: Ctrl+H (health), Ctrl+I (info), Ctrl+L (clear log)', 'info');
+            log('FIXED: Export functions now use the chosen distance metric!', 'success');
+            log('FIXED: Export filenames include metric type for clarity!', 'success');
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            stopLoadingStatusPolling();
+        });
+
+        // Initialize when page loads
+        window.onload = initializeInterface;
+    </script>
+</body>
+</html>
