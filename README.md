@@ -35,13 +35,5 @@ ____________________________
 - Backend API version is officially at a 1.0 launch state.
 ____________________________
 #### **Next update(s):**
-- Check over unit tests and code review backend.
-- Clean up notebooks for readability. 
-  - Break up into blocks and remove unnecessary comments.
-- Split code up accordingly.
-  - For instance, running server should be main.
-  - Distance calculations in one class, so on and so forth.
-- Make sure .gitignore is up-to-date and ignoring all necessary files.
-- Make README thorough, professional, and clean looking.
 - Start frontend considerations.
 ____________________________
