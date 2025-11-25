@@ -33,6 +33,7 @@ Frontend:
 ____________________________
 #### **Release Version v0.2 Notes:**
 - Backend API version is officially at a 0.2 launch state (this is an incomplete version and there will be continuous updates).
+- Assume that there may be bugs still present. One worth noting at the moment are debug calls not working with the tester application. This will be, most liklely, the next main code update.
 ____________________________
 #### **Next update(s):**
 - Start frontend considerations.
