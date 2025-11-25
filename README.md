@@ -31,8 +31,8 @@ Frontend:
   - React
   - ThreeJS
 ____________________________
-#### **Release Version v1.0 Notes:**
-- Backend API version is officially at a 1.0 launch state.
+#### **Release Version v0.2 Notes:**
+- Backend API version is officially at a 0.2 launch state (this is an incomplete version and there will be continuous updates).
 ____________________________
 #### **Next update(s):**
 - Start frontend considerations.
