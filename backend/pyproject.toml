@@ -1,0 +1,9 @@
+[tool.pytest.ini_options]
+# Run from the backend/ directory so "app" is importable as a package.
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = [
+    # UMAP / numba and transformers emit a lot of benign deprecation noise.
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+]

@@ -1,0 +1,75 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+
+  body {
+    @apply bg-ink-950 text-paper font-sans antialiased;
+    overflow: hidden; /* the app manages its own scroll regions */
+  }
+
+  /* Subtle film-grain-free vignette so panels read against the 3D scene. */
+  #root {
+    background: radial-gradient(120% 120% at 50% 0%, rgba(216, 98, 58, 0.05), transparent 55%);
+  }
+}
+
+@layer components {
+  /* Instrument-style panel: solid, hairline-bordered, crisp — not frosted glass. */
+  .panel {
+    @apply rounded-lg border border-white/10 bg-ink-900/95 shadow-panel;
+  }
+
+  .panel-header {
+    @apply flex items-center gap-2 px-4 pt-4 pb-2 font-mono text-[10px] font-medium uppercase tracking-widest2 text-faint;
+  }
+
+  /* A small tick that precedes section labels, reinforcing the instrument feel. */
+  .panel-header::before {
+    content: "";
+    @apply h-2 w-px bg-accent;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium
+           transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .btn-primary {
+    @apply btn bg-accent font-semibold text-accent-ink hover:bg-accent-soft hover:shadow-accent active:translate-y-px;
+  }
+
+  .btn-ghost {
+    @apply btn border border-white/10 bg-white/[0.03] text-paper hover:border-white/20 hover:bg-white/[0.07];
+  }
+
+  .input {
+    @apply w-full rounded-md border border-white/10 bg-ink-950/80 px-3 py-2 text-sm text-paper
+           placeholder:text-faint outline-none transition focus:border-accent/70 focus:ring-1 focus:ring-accent/40;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[11px] font-medium;
+  }
+
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(155, 149, 140, 0.3) transparent;
+  }
+  .scroll-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-white/15;
+  }
+}
