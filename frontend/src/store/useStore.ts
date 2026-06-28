@@ -9,6 +9,7 @@
 import { create } from "zustand";
 import { api, ApiError } from "../lib/api";
 import { normalizeCoordinates } from "../lib/layout";
+import { applyModelTheme, themeForModel } from "../lib/modelTheme";
 import type {
   AnalysisStatistics,
   AvailableModels,
@@ -58,6 +59,8 @@ interface AppState {
   neighborIndices: number[];
   neighborMetric: DistanceMetric;
   focus: FocusRequest | null;
+  // Hex of the current model's accent glow, used by the 3D scene (halos).
+  accentGlowHex: string;
 
   // Search.
   searchQuery: string;
@@ -115,6 +118,7 @@ export const useStore = create<AppState>((set, get) => ({
   neighborIndices: [],
   neighborMetric: "cosine",
   focus: null,
+  accentGlowHex: "#f0a184",
   searchQuery: "",
   searchResults: [],
   comparison: null,
@@ -163,7 +167,16 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       await api.loadModel(model);
       clearInterval(poll);
-      set({ loadedModel: model, loadState: "visualizing", loadProgress: "Projecting embeddings…" });
+      // Re-theme the UI/scene accent based on the model family (a bit of fun).
+      const family = get().models?.presets.find((p) => p.id === model)?.family;
+      const theme = themeForModel(model, family);
+      applyModelTheme(theme);
+      set({
+        loadedModel: model,
+        loadState: "visualizing",
+        loadProgress: "Projecting embeddings…",
+        accentGlowHex: theme.glowHex,
+      });
       await get().regenerate();
       // Statistics are non-critical; fetch in the background.
       api

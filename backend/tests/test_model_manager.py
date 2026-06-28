@@ -14,11 +14,12 @@ import pytest
 
 from app.config import Settings
 from app.core.exceptions import (
+    ModelLoadError,
     ModelLoadTimeoutError,
     ModelNotAllowedError,
     ModelNotLoadedError,
 )
-from app.core.model_manager import ModelManager
+from app.core.model_manager import ModelManager, _extract_input_embeddings
 from app.core.visualizer import LoadedModel
 from app.schemas import LoadState
 from tests.conftest import VOCAB, FakeTokenizer
@@ -93,3 +94,35 @@ def test_timeout_surfaces_error(settings: Settings) -> None:
     with pytest.raises(ModelLoadTimeoutError):
         asyncio.run(manager.ensure_loaded("slowpoke"))
     assert manager.status("slowpoke")["state"] == LoadState.error
+
+
+# --- graceful handling of models without usable embeddings ----------------
+class _NoEmbeddingsModel:
+    def get_input_embeddings(self):
+        return None
+
+
+class _NoWeightModel:
+    def get_input_embeddings(self):
+        return object()  # has no .weight
+
+
+def test_extract_embeddings_missing_raises() -> None:
+    with pytest.raises(ModelLoadError):
+        _extract_input_embeddings(_NoEmbeddingsModel(), "vision-model")
+    with pytest.raises(ModelLoadError):
+        _extract_input_embeddings(_NoWeightModel(), "weird-model")
+
+
+def test_load_failure_sets_error_state_and_raises(settings: Settings) -> None:
+    manager = ModelManager(settings)
+
+    def boom(slot):
+        raise ModelLoadError("does not expose a token embedding table")
+
+    manager._blocking_load = boom  # type: ignore[assignment]
+    with pytest.raises(ModelLoadError):
+        asyncio.run(manager.ensure_loaded("no-embeddings-model"))
+    status = manager.status("no-embeddings-model")
+    assert status["state"] == LoadState.error
+    assert "embedding" in (status["error"] or "")

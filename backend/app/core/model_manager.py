@@ -34,6 +34,54 @@ from app.core.visualizer import LoadedModel
 from app.schemas import LoadState
 
 
+def _friendly_hf_error(name: str, exc: Exception, what: str) -> str:
+    """Turn a raw Hugging Face exception into a clear, user-facing message.
+
+    ``what`` is "tokenizer" or "model" to indicate which stage failed.
+    """
+    text = str(exc).lower()
+    if "trust_remote_code" in text:
+        return (
+            f"'{name}' ships custom code that must be trusted to run. For safety "
+            f"this server only loads standard architectures."
+        )
+    if any(s in text for s in ("401", "403", "gated", "authentication", "is not authorized")):
+        return f"'{name}' is private or gated and can't be loaded without credentials."
+    if any(s in text for s in ("404", "not found", "does not appear", "repository not found")):
+        return f"Model '{name}' was not found on the Hugging Face Hub. Check the id."
+    if any(s in text for s in ("connection", "offline", "couldn't reach", "timed out", "proxy")):
+        return f"Couldn't reach the Hugging Face Hub to download '{name}'. Check your connection."
+    # Fall back to a trimmed version of the underlying error.
+    detail = str(exc).splitlines()[0][:200]
+    return f"Could not load the {what} for '{name}': {detail}"
+
+
+def _extract_input_embeddings(model: object, name: str) -> np.ndarray:
+    """Pull the token input-embedding matrix out of a loaded model.
+
+    Not every architecture exposes a usable token embedding table (vision
+    models, audio models, some custom heads, encoder-only setups with tied or
+    absent input embeddings). Rather than letting an ``AttributeError`` bubble
+    up as an opaque 500, we validate and raise a clear, user-facing message.
+    """
+    getter = getattr(model, "get_input_embeddings", None)
+    layer = getter() if callable(getter) else None
+    weight = getattr(layer, "weight", None) if layer is not None else None
+    if weight is None:
+        raise ModelLoadError(
+            f"'{name}' does not expose a token embedding table, so its embedding "
+            f"space can't be visualized. Try a text model such as gpt2 or bert-base-uncased."
+        )
+
+    matrix = weight.data.detach().cpu().numpy()
+    if matrix.ndim != 2 or matrix.shape[0] < 2 or matrix.shape[1] < 2:
+        raise ModelLoadError(
+            f"'{name}' has an unexpected embedding shape {tuple(matrix.shape)}; "
+            f"it can't be visualized."
+        )
+    return matrix
+
+
 class _ModelSlot:
     """Mutable per-model bookkeeping held in the cache.
 
@@ -126,7 +174,11 @@ class ModelManager:
                     f"{self._settings.model_load_timeout_seconds}s."
                 )
                 raise ModelLoadTimeoutError(slot.error)
-            except ModelLoadError:
+            except ModelLoadError as exc:
+                # Already a precise, user-facing error — record it on the slot
+                # (so /status reflects the failure) and re-raise unchanged.
+                slot.state = LoadState.error
+                slot.error = exc.message
                 raise
             except Exception as exc:  # pragma: no cover - defensive catch-all
                 slot.state = LoadState.error
@@ -150,7 +202,10 @@ class ModelManager:
 
         name = slot.name
         slot.progress = "Downloading tokenizer…"
-        tokenizer = AutoTokenizer.from_pretrained(name)
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(name)
+        except Exception as exc:
+            raise ModelLoadError(_friendly_hf_error(name, exc, "tokenizer")) from exc
 
         # GPT-2 family ships without a pad token; align it with EOS so the
         # tokenizer is well-formed even though we don't pad during analysis.
@@ -160,12 +215,13 @@ class ModelManager:
             tokenizer.pad_token = tokenizer.eos_token
 
         slot.progress = "Downloading model weights…"
-        model = AutoModel.from_pretrained(name)
+        try:
+            model = AutoModel.from_pretrained(name)
+        except Exception as exc:
+            raise ModelLoadError(_friendly_hf_error(name, exc, "model")) from exc
 
         slot.progress = "Extracting embeddings…"
-        embeddings: np.ndarray = (
-            model.get_input_embeddings().weight.data.cpu().numpy()
-        )
+        embeddings = _extract_input_embeddings(model, name)
 
         slot.progress = "Preparing tokens…"
         loaded = LoadedModel(

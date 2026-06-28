@@ -18,14 +18,14 @@ export default {
         paper: "#ece8e1",
         muted: "#9b958c",
         faint: "#6a655e",
-        // Signature accent: terracotta/clay. Deliberately chosen to sit apart
-        // from the token-type palette (cyan/amber/pink/violet) so UI chrome and
-        // data are never confused.
+        // Signature accent, driven by CSS variables so it can be re-themed per
+        // model at runtime (see src/lib/modelTheme.ts). The channels are stored
+        // as "R G B" triples so Tailwind's /opacity modifiers keep working.
         accent: {
-          DEFAULT: "#d8623a",
-          soft: "#e87f5a",
-          glow: "#f0a184",
-          ink: "#1a0e08", // text color to sit on top of the accent fill
+          DEFAULT: "rgb(var(--accent) / <alpha-value>)",
+          soft: "rgb(var(--accent-soft) / <alpha-value>)",
+          glow: "rgb(var(--accent-glow) / <alpha-value>)",
+          ink: "#160d07", // dark text to sit on top of the accent fill
         },
         // Token-type colors, kept in sync with src/lib/tokenColors.ts.
         token: {
@@ -48,7 +48,8 @@ export default {
       boxShadow: {
         // Crisp, low-spread shadows + a hairline top highlight for "panel" depth.
         panel: "0 1px 0 0 rgba(255,255,255,0.04) inset, 0 16px 40px -24px rgba(0,0,0,0.9)",
-        accent: "0 0 0 1px rgba(216,98,58,0.4), 0 6px 20px -8px rgba(216,98,58,0.5)",
+        accent:
+          "0 0 0 1px rgb(var(--accent) / 0.4), 0 6px 20px -8px rgb(var(--accent) / 0.5)",
       },
       keyframes: {
         "fade-in": {

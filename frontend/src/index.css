@@ -5,6 +5,14 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Accent channels ("R G B"), re-themed per model at runtime. Default is the
+       terracotta signature; see src/lib/modelTheme.ts. */
+    --accent: 216 98 58;
+    --accent-soft: 232 127 90;
+    --accent-glow: 240 161 132;
+  }
+
   html,
   body,
   #root {

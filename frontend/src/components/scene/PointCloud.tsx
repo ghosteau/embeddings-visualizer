@@ -46,6 +46,7 @@ export function PointCloud({ data }: { data: VisualizationData }) {
   const neighborIndices = useStore((s) => s.neighborIndices);
   const selectToken = useStore((s) => s.selectToken);
   const setHovered = useStore((s) => s.setHovered);
+  const accentGlowHex = useStore((s) => s.accentGlowHex);
 
   const count = Math.min(displayCount || data.tokens.length, data.tokens.length);
 
@@ -112,8 +113,8 @@ export function PointCloud({ data }: { data: VisualizationData }) {
       {/* Neighbor halos: warm accent discs, drawn from the full position set. */}
       {neighborIndices.map((i) => (
         <mesh key={`nb-${i}`} position={posOf(i)}>
-          <sphereGeometry args={[0.24, 12, 12]} />
-          <meshBasicMaterial color="#f0a184" transparent opacity={0.55} />
+          <sphereGeometry args={[0.24, 10, 10]} />
+          <meshBasicMaterial color={accentGlowHex} transparent opacity={0.55} />
         </mesh>
       ))}
 

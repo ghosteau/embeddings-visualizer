@@ -1,12 +1,16 @@
 /**
  * The WebGL stage: camera, controls, post-processing bloom, and the point cloud.
  *
- * The raycaster's Points threshold is widened so the small glowing points are
- * easy to hover/click. Bloom gives the additive points their characteristic
- * glow. A CameraRig smoothly recenters the view on a focused token.
+ * Performance notes:
+ * - DPR is capped at 1.5 so bloom (a full-screen, multi-pass effect) doesn't
+ *   have to shade up to 4x the pixels on HiDPI displays — the single biggest
+ *   smoothness win here.
+ * - Bloom uses mipmap blur (cheaper than a large kernel) at a modest intensity.
+ * - We keep a continuous render loop (so orbit damping glides and external
+ *   capture/RAF integrations keep working).
  */
 
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
@@ -23,25 +27,23 @@ function CameraRig() {
     | { target: Vector3; update: () => void }
     | null;
   const camera = useThree((s) => s.camera);
-  const desired = useRef<Vector3 | null>(null);
-
-  useEffect(() => {
-    if (!focus || !positions) return;
-    const [x, y, z] = pointAt(positions, focus.index);
-    desired.current = new Vector3(x, y, z);
-  }, [focus, positions]);
+  const goal = useRef<Vector3 | null>(null);
+  const lastNonce = useRef<number>(-1);
 
   useFrame(() => {
-    const goal = desired.current;
-    if (!goal || !controls) return;
-    const t = 0.1;
-    controls.target.lerp(goal, t);
-    // Keep a comfortable framing distance while approaching the point.
+    // Pick up a new focus request (compared by nonce so repeats re-trigger).
+    if (focus && positions && focus.nonce !== lastNonce.current) {
+      lastNonce.current = focus.nonce;
+      const [x, y, z] = pointAt(positions, focus.index);
+      goal.current = new Vector3(x, y, z);
+    }
+    if (!goal.current || !controls) return;
+    const t = 0.12;
+    controls.target.lerp(goal.current, t);
     const dir = camera.position.clone().sub(controls.target).normalize();
     const dist = Math.min(Math.max(camera.position.distanceTo(controls.target), 7), 13);
-    camera.position.lerp(goal.clone().add(dir.multiplyScalar(dist)), t);
-    controls.update();
-    if (controls.target.distanceTo(goal) < 0.05) desired.current = null;
+    camera.position.lerp(goal.current.clone().add(dir.multiplyScalar(dist)), t);
+    if (controls.target.distanceTo(goal.current) < 0.04) goal.current = null;
   });
 
   return null;
@@ -53,7 +55,10 @@ export function EmbeddingCanvas() {
 
   return (
     <Canvas
-      dpr={[1, 2]}
+      dpr={[1, 1.5]}
+      // MSAA off: bloom + additive points hide aliasing, and skipping it is a
+      // big fill-rate win. Prefer the discrete GPU when one is available.
+      gl={{ antialias: false, powerPreference: "high-performance" }}
       camera={{ position: [16, 12, 22], fov: 55, near: 0.1, far: 400 }}
       // Widen the points raycast threshold so the small glowing points are easy
       // to hover/click. Cast: r3f types want a full RaycasterParameters object.
@@ -68,9 +73,9 @@ export function EmbeddingCanvas() {
 
       <OrbitControls
         enableDamping
-        dampingFactor={0.08}
-        rotateSpeed={0.6}
-        zoomSpeed={0.8}
+        dampingFactor={0.1}
+        rotateSpeed={0.55}
+        zoomSpeed={0.85}
         minDistance={4}
         maxDistance={120}
         makeDefault
@@ -78,12 +83,7 @@ export function EmbeddingCanvas() {
       <CameraRig />
 
       <EffectComposer>
-        <Bloom
-          intensity={0.65}
-          luminanceThreshold={0.18}
-          luminanceSmoothing={0.5}
-          mipmapBlur
-        />
+        <Bloom intensity={0.55} luminanceThreshold={0.22} luminanceSmoothing={0.5} mipmapBlur />
       </EffectComposer>
     </Canvas>
   );
