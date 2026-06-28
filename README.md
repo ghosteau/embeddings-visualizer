@@ -15,7 +15,7 @@ Built for researchers, students, and developers curious about how language model
 | Component | State |
 | --- | --- |
 | **Backend** (FastAPI) | v1.0 — remastered: model-keyed LRU cache, vectorized math, typed errors, tested, Dockerized |
-| **Frontend** (React + Three.js) | 🚧 In progress |
+| **Frontend** (React + Three.js) |
 
 ---
 
