@@ -61,6 +61,8 @@ interface AppState {
   focus: FocusRequest | null;
   // Hex of the current model's accent glow, used by the 3D scene (halos).
   accentGlowHex: string;
+  // Short label describing the active theme, e.g. "OpenAI / GPT".
+  themeLabel: string | null;
 
   // Search.
   searchQuery: string;
@@ -119,6 +121,7 @@ export const useStore = create<AppState>((set, get) => ({
   neighborMetric: "cosine",
   focus: null,
   accentGlowHex: "#f0a184",
+  themeLabel: null,
   searchQuery: "",
   searchResults: [],
   comparison: null,
@@ -174,8 +177,9 @@ export const useStore = create<AppState>((set, get) => ({
       set({
         loadedModel: model,
         loadState: "visualizing",
-        loadProgress: "Projecting embeddings…",
+        loadProgress: "Projecting embeddings… (first projection can take ~30s)",
         accentGlowHex: theme.glowHex,
+        themeLabel: theme.label,
       });
       await get().regenerate();
       // Statistics are non-critical; fetch in the background.
@@ -203,7 +207,9 @@ export const useStore = create<AppState>((set, get) => ({
       set({
         vizData,
         positions: normalizeCoordinates(vizData.coordinates),
-        displayCount: vizData.tokens.length, // show everything by default
+        // Render a lighter subset by default for smoothness; every token stays
+        // searchable/inspectable, and the "Visible points" slider goes to max.
+        displayCount: Math.min(3000, vizData.tokens.length),
         selectedIndex: null,
         tokenDetail: null,
         neighborIndices: [],

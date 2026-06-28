@@ -20,12 +20,12 @@ export interface ModelTheme {
 }
 
 const THEMES: Record<string, ModelTheme> = {
-  // OpenAI's signature green — its actual brand color (easy to swap for blue).
+  // Blue for the GPT / OpenAI family.
   gpt: {
-    accent: "16 163 127",
-    accentSoft: "32 191 149",
-    accentGlow: "94 214 178",
-    glowHex: "#5ed6b2",
+    accent: "59 130 246",
+    accentSoft: "96 165 250",
+    accentGlow: "147 197 253",
+    glowHex: "#93c5fd",
     label: "OpenAI / GPT",
   },
   // Google blue for the BERT family.

@@ -104,9 +104,15 @@ export const api = {
     index: number,
     nNeighbors = 15,
     metric: DistanceMetric = "cosine",
+    includeEmbedding = false,
   ) =>
     request<TokenWithNeighbors>(
-      `/api/tokens/${index}/full${q({ model, n_neighbors: nNeighbors, metric })}`,
+      `/api/tokens/${index}/full${q({
+        model,
+        n_neighbors: nNeighbors,
+        metric,
+        include_embedding: includeEmbedding,
+      })}`,
     ),
 
   tokenDetails: (model: string, index: number) =>

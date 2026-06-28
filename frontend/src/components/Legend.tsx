@@ -6,7 +6,10 @@ import type { TokenType } from "../lib/types";
 
 export function Legend() {
   const vizData = useStore((s) => s.vizData);
+  const statistics = useStore((s) => s.statistics);
   if (!vizData) return null;
+
+  const vocab = statistics?.model_info?.vocabulary_size as number | undefined;
 
   const dist = vizData.statistics.type_distribution;
   const types = (Object.keys(TOKEN_COLORS) as TokenType[]).filter((t) => (dist[t] ?? 0) > 0);
@@ -29,6 +32,7 @@ export function Legend() {
         ))}
       </ul>
       <div className="mt-3 border-t border-white/10 pt-2 font-mono text-[11px] text-faint">
+        {vocab ? `${vocab.toLocaleString()} vocab · ` : ""}
         {vizData.statistics.original_dimension}D → {vizData.statistics.reduced_dimension}D · UMAP/
         {vizData.config.metric}
       </div>

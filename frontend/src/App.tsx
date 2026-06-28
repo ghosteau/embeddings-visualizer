@@ -18,10 +18,28 @@ import { useStore } from "./store/useStore";
 export default function App() {
   const init = useStore((s) => s.init);
   const vizData = useStore((s) => s.vizData);
+  const clearSelection = useStore((s) => s.clearSelection);
 
   useEffect(() => {
     init();
   }, [init]);
+
+  // Researcher-friendly keyboard shortcuts: "/" jumps to search, "Esc" clears.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = document.activeElement;
+      const typing = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
+      if (e.key === "/" && !typing) {
+        e.preventDefault();
+        document.getElementById("token-search")?.focus();
+      } else if (e.key === "Escape") {
+        if (typing) (el as HTMLElement).blur();
+        else clearSelection();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [clearSelection]);
 
   return (
     <div className="relative h-screen w-screen overflow-hidden">
@@ -51,7 +69,7 @@ export default function App() {
       {/* Controls hint, bottom center. */}
       {vizData && (
         <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 font-mono text-[11px] text-faint">
-          drag to orbit · scroll to zoom · click a point to inspect · click empty space to deselect
+          drag to orbit · scroll to zoom · click to inspect · / to search · esc to deselect
         </div>
       )}
 

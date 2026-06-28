@@ -62,7 +62,11 @@ class Settings(BaseSettings):
     # can be tens of thousands of tokens; UMAP on all of them is slow, so we
     # prepare and project the most-frequent subset. This is the single source of
     # truth for how many points exist; the frontend decides how many to *show*.
-    default_top_n: int = Field(default=3000, ge=10, le=50000)
+    # 6000 covers the common research vocabulary (man/woman/dog/cat/science/king…)
+    # while keeping the one-time UMAP projection reasonably fast. The frontend
+    # renders a lighter default subset for smoothness; all of these stay
+    # searchable / inspectable / comparable.
+    default_top_n: int = Field(default=6000, ge=10, le=50000)
 
     # Cap on the number of cached UMAP projections (keyed by config) per model.
     max_cached_projections: int = Field(default=8, ge=1, le=64)

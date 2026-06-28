@@ -16,8 +16,9 @@ export function SearchPanel() {
   return (
     <div className="space-y-2">
       <input
+        id="token-search"
         className="input font-mono"
-        placeholder="Search any token…"
+        placeholder="Search any token…   ( / )"
         value={searchQuery}
         disabled={!loadedModel}
         onChange={(e) => runSearch(e.target.value)}

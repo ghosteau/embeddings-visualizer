@@ -4,7 +4,9 @@
  * pick or search a token when nothing is selected.
  */
 
+import { useState } from "react";
 import { useStore } from "../store/useStore";
+import { api } from "../lib/api";
 import { TOKEN_COLORS } from "../lib/tokenColors";
 import { SegToggle, Stat } from "./ui";
 import { Logo } from "./Logo";
@@ -17,6 +19,9 @@ export function DetailPanel() {
   const neighborMetric = useStore((s) => s.neighborMetric);
   const setNeighborMetric = useStore((s) => s.setNeighborMetric);
   const clearSelection = useStore((s) => s.clearSelection);
+  const loadedModel = useStore((s) => s.loadedModel);
+  const pushToast = useStore((s) => s.pushToast);
+  const [exporting, setExporting] = useState(false);
 
   if (!detail) {
     return (
@@ -31,6 +36,44 @@ export function DetailPanel() {
   }
 
   const d = detail.details;
+
+  const copyToken = async () => {
+    try {
+      await navigator.clipboard.writeText(d.token);
+      pushToast("success", "Token copied to clipboard.");
+    } catch {
+      pushToast("error", "Clipboard not available.");
+    }
+  };
+
+  // Export the full record for this token — metadata, neighbors, and the raw
+  // embedding vector — as JSON, for downstream analysis.
+  const exportJson = async () => {
+    if (!loadedModel) return;
+    setExporting(true);
+    try {
+      const full = await api.tokenFull(loadedModel, d.index, 50, neighborMetric, true);
+      const payload = {
+        model: loadedModel,
+        metric: neighborMetric,
+        exported_at: new Date().toISOString(),
+        ...full,
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safe = (d.token.trim() || `token_${d.index}`).replace(/[^a-z0-9_-]+/gi, "_");
+      a.href = url;
+      a.download = `${loadedModel.replace(/[^a-z0-9]+/gi, "_")}_${safe}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      pushToast("success", "Exported token JSON.");
+    } catch (e) {
+      pushToast("error", e instanceof Error ? e.message : "Export failed.");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div className="scroll-thin flex h-full flex-col gap-4 overflow-y-auto p-4">
@@ -56,6 +99,19 @@ export function DetailPanel() {
         {d.is_uppercase && <span className="chip">upper</span>}
         {d.is_digit && <span className="chip">digit</span>}
         {d.has_special_chars && <span className="chip">special</span>}
+      </div>
+
+      <div className="flex gap-2">
+        <button className="btn-ghost flex-1 px-2 py-1.5 text-xs" onClick={copyToken}>
+          Copy token
+        </button>
+        <button
+          className="btn-ghost flex-1 px-2 py-1.5 text-xs"
+          onClick={exportJson}
+          disabled={exporting}
+        >
+          {exporting ? "Exporting…" : "Export JSON"}
+        </button>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
