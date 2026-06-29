@@ -6,30 +6,30 @@ Built for researchers, students, and developers curious about how language model
 
 ---
 
-## ✨ Features
+## Features
 
-### 🎯 3D Token Explorer
+### 3D Token Explorer
 - **Interactive 3D point cloud** — drag to orbit, scroll to zoom, click to inspect.
 - **Smooth camera fly-to** — search for a token and the camera smoothly flies to its position in 3D space.
 - **Live neighbor highlighting** — select a token and see its semantically similar neighbors highlighted with glowing halos.
 - **Vocabulary access** — search and inspect any of the top 6,000 most-frequent tokens, even if the visible cloud is lighter.
 
-### 🔍 Search & Comparison
+### Search & Comparison
 - **Fast token search** — type a word; jump to it with keyboard shortcut (`/`).
 - **Token comparison** — compare any two tokens side-by-side: cosine similarity, euclidean distance, and shared semantics.
 - **Neighbor analysis** — drill into the 20 nearest semantic neighbors for any token.
 
-### 📊 Researcher Tools
+### Researcher Tools
 - **Export JSON** — download a token's metadata, neighbors, and raw embedding vector for downstream analysis.
 - **Copy token** — quickly copy token text to clipboard.
 - **Vocabulary size display** — see the model's total vocabulary alongside the projected subset.
 - **Keyboard shortcuts** — `/` to search, `Esc` to deselect.
 
-### 🎨 Per-Model Theming
+### Per-Model Theming
 - **Auto re-themes UI per model family** — GPT/OpenAI models are blue, BERT is Google blue, RoBERTa is violet, custom models are terracotta.
 - **Accent colors** theme the entire UI, buttons, ambient glow, and in-scene neighbor halos.
 
-### ⚡ Performance & Smoothness
+### Performance & Smoothness
 - **Capped DPR rendering** — bloom effect optimized for smooth 60 FPS on high-resolution displays.
 - **UMAP caching** — first projection of a config takes ~20–40s; repeats are instant.
 - **Model caching** — first model download takes ~1–5 min; repeats are instant.
@@ -37,7 +37,7 @@ Built for researchers, students, and developers curious about how language model
 
 ---
 
-## 📐 Architecture
+## Architecture
 
 ```
 embeddings-visualizer/
@@ -117,7 +117,7 @@ there, not in React.
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### One-time setup
 
@@ -161,7 +161,7 @@ Open **http://localhost:5173**, pick a model, click **Load & visualize**.
 
 ---
 
-## 📖 Usage
+## Usage
 
 ### Exploring the point cloud
 - **Drag** to orbit the camera.
@@ -195,7 +195,7 @@ Open **http://localhost:5173**, pick a model, click **Load & visualize**.
 
 ---
 
-## 🔌 API Endpoints
+## API Endpoints
 
 All requests are **model-keyed** (`?model=gpt2`, `?model=bert-base-uncased`, etc.).
 
@@ -222,7 +222,7 @@ All requests are **model-keyed** (`?model=gpt2`, `?model=bert-base-uncased`, etc
 
 ---
 
-## 🛠 Development
+## Development
 
 ### Run tests (backend)
 ```bash
@@ -257,7 +257,7 @@ npm run build                # production build → dist/
 
 ---
 
-## 🎨 Design & Theming
+## Design & Theming
 
 ### Per-Model Colors
 
@@ -279,7 +279,7 @@ glass or gradients — clean, minimal, distinctive.
 
 ---
 
-## 📦 Deployment
+## Deployment
 
 ### Docker (Backend)
 
@@ -311,7 +311,7 @@ See [`.env.example`](.env.example) for backend config:
 
 ---
 
-## 🧠 Understanding the Code
+## Understanding the Code
 
 ### Why per-model caching?
 
@@ -340,7 +340,7 @@ the procedural Three.js world and React's component model.
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions welcome! Areas for exploration:
 
@@ -353,14 +353,14 @@ Contributions welcome! Areas for exploration:
 
 ---
 
-## 📝 License & Attribution
+## License & Attribution
 
 - **Manny McGrail** — Project direction, backend API, ML module.
 - **Claude (Anthropic)** — Backend remaster (model-keyed LRU, async timeouts, typed errors), full frontend (React/Three.js, UMAP caching, keyboard shortcuts, theming, export/search/compare workflows).
 
 ---
 
-## 🔗 Related Work
+## Related Work
 
 - **Hugging Face Transformers** — model loading and tokenization.
 - **UMAP** — dimensionality reduction.
@@ -369,7 +369,7 @@ Contributions welcome! Areas for exploration:
 
 ---
 
-## ❓ FAQ
+## FAQ
 
 **Q: Can I load my own model?**
 A: Yes. Type any Hugging Face model ID (e.g., `sentence-transformers/all-MiniLM-L6-v2`) in the "custom" field. If the model exports a token embedding table, it works. Vision/audio/other architectures fail clearly.
@@ -388,6 +388,6 @@ A: Real browsers re-resolve `var(--accent)` instantly. If you're in the Claude C
 
 ---
 
-## 📧 Questions?
+## Questions?
 
 Open an issue on GitHub or reach out to the maintainers. Enjoy exploring!
