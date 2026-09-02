@@ -138,7 +138,7 @@ class VisualizationConfig(BaseModel):
         0.1, ge=0.0, le=0.99, description="UMAP minimum point separation."
     )
     metric: DistanceMetric = Field(
-        DistanceMetric.cosine, description="Distance metric UMAP optimises against."
+        DistanceMetric.cosine, description="Distance metric UMAP optimizes against."
     )
 
 

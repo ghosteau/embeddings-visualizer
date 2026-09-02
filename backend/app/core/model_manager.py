@@ -237,7 +237,7 @@ class ModelManager:
             max_cached_projections=self._settings.max_cached_projections,
         )
         # Release full weights immediately; the service only retains the
-        # compact analysed embedding subset owned by ``loaded``.
+        # compact analyzed embedding subset owned by ``loaded``.
         del embeddings
         del model
         gc.collect()

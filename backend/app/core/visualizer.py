@@ -68,7 +68,7 @@ class LoadedModel:
     ) -> None:
         self.name = name
         # Record the full-vocabulary dimensions for reporting, but only retain
-        # the analysed subset below — holding the entire embedding matrix as
+        # the analyzed subset below — holding the entire embedding matrix as
         # well would roughly double memory for large models.
         self.vocabulary_size = int(embeddings.shape[0])
         self.embedding_dimension = int(embeddings.shape[1])
@@ -170,7 +170,7 @@ class LoadedModel:
 
     # ------------------------------------------------------------- internals --
     def _require_index(self, index: int) -> None:
-        """Raise ``IndexError`` if ``index`` is outside the analysed range."""
+        """Raise ``IndexError`` if ``index`` is outside the analyzed range."""
         if index < 0 or index >= self.token_count:
             raise IndexError(
                 f"Token index {index} out of range (0..{self.token_count - 1})."
@@ -421,7 +421,7 @@ class LoadedModel:
         return counts
 
     def statistics(self) -> dict[str, Any]:
-        """Compute aggregate statistics over the analysed token subset."""
+        """Compute aggregate statistics over the analyzed token subset."""
         lengths = np.asarray(self.lengths)
         return {
             "model_info": {

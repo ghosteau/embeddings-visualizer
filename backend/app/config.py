@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     # cancelled. Protects the service from huge/slow downloads hanging workers.
     model_load_timeout_seconds: int = Field(default=180, ge=10, le=1800)
 
-    # Number of most-frequent tokens to analyse per model. The full vocabulary
+    # Number of most-frequent tokens to analyze per model. The full vocabulary
     # can be tens of thousands of tokens; UMAP on all of them is slow, so we
     # prepare and project the most-frequent subset. This is the single source of
     # truth for how many points exist; the frontend decides how many to *show*.
