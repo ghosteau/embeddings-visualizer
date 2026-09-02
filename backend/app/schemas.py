@@ -7,10 +7,11 @@ auto-generated OpenAPI schema consumed by the frontend's typed client.
 
 from __future__ import annotations
 
+import re
 from enum import Enum
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -70,9 +71,22 @@ class LoadModelRequest(BaseModel):
     model: str = Field(
         ...,
         min_length=1,
+        max_length=200,
         description="Hugging Face model id to load, e.g. 'gpt2'.",
         examples=["gpt2"],
     )
+
+    @field_validator("model")
+    @classmethod
+    def validate_hugging_face_id(cls, value: str) -> str:
+        """Accept Hub-style repository ids, never URLs or filesystem paths."""
+        cleaned = value.strip()
+        if not re.fullmatch(
+            r"[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)?",
+            cleaned,
+        ):
+            raise ValueError("Use a Hugging Face model id such as 'gpt2' or 'owner/model'.")
+        return cleaned
 
 
 class LoadModelResponse(BaseModel):

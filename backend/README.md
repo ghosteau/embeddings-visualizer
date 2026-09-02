@@ -1,104 +1,170 @@
-# Embeddings Visualizer — Backend
+# Embeddings Visualizer backend
 
-A FastAPI service for loading transformer language models, extracting their
-token embedding spaces, projecting them to 2D/3D with UMAP, and exploring the
-geometry of those spaces (nearest neighbors, similarity, comparisons,
-statistics).
+The backend is a FastAPI service for loading transformer token embedding tables,
+projecting prepared vocabularies with UMAP, and exposing token-level analysis over
+HTTP. It is model-keyed: every analysis request identifies its model rather than
+mutating one global active-model singleton.
 
-## Why it's structured this way
+## Design
 
-The service is **model-keyed and stateless per request**. Instead of one global
-"currently loaded model" that all visitors share and overwrite, a
-`ModelManager` keeps an **LRU cache of models keyed by name**:
+`ModelManager` maintains a bounded least-recently-used cache keyed by Hugging Face
+model ID. A per-model asynchronous lock prevents duplicate concurrent loads, and
+each load runs outside the event loop under a configurable timeout. Eviction
+releases model resources and triggers garbage collection.
 
-- Two users requesting `gpt2` share a single in-memory copy.
-- At most `MAX_CACHED_MODELS` are resident at once; the least-recently-used is
-  evicted, capping memory on modest hosts.
-- A per-model async lock collapses simultaneous load requests into one load.
-- Loads run in a worker thread under a real `asyncio.wait_for` timeout, so a
-  slow download can't hang the server.
+`LoadedModel` owns the prepared token subset and numerical operations:
 
-Every query endpoint names the model it operates on (`?model=gpt2`), so
-concurrent users never interfere with each other.
+- tokenizer batch decoding with a compatibility fallback;
+- preservation of raw subword whitespace;
+- precomputed token metadata and normalized embeddings;
+- vectorized cosine and Euclidean nearest-neighbor search;
+- vectorized pairwise cosine similarity;
+- bounded, configuration-keyed UMAP projection caching;
+- serialized per-model projection computation to avoid duplicate expensive fits.
+
+Projection work runs in a worker thread from the API route. The ASGI event loop
+therefore remains available for health, status, and lightweight token requests.
 
 ## Layout
 
-```
+```text
 backend/
-  app/
-    main.py            # app factory, CORS, lifespan, exception handlers
-    config.py          # env-driven settings (pydantic-settings)
-    schemas.py         # Pydantic request/response contracts
-    core/
-      exceptions.py    # typed domain errors -> HTTP statuses
-      visualizer.py    # LoadedModel: vectorized embedding math + projection cache
-      model_manager.py # LRU model cache, async load w/ timeout
-    api/
-      health.py models.py visualization.py tokens.py analysis.py deps.py
-  tests/               # offline pytest suite (synthetic data, no downloads)
-  requirements.txt  requirements-dev.txt  Dockerfile  .env.example
+|-- app/
+|   |-- api/
+|   |   |-- analysis.py
+|   |   |-- health.py
+|   |   |-- models.py
+|   |   |-- tokens.py
+|   |   `-- visualization.py
+|   |-- core/
+|   |   |-- exceptions.py
+|   |   |-- model_manager.py
+|   |   `-- visualizer.py
+|   |-- config.py
+|   |-- main.py
+|   `-- schemas.py
+|-- tests/
+|-- .env.example
+|-- requirements.txt
+`-- requirements-dev.txt
 ```
 
-## Running locally
+## Local setup
 
-```bash
-cd backend
-python -m venv .venv && source .venv/Scripts/activate   # Windows Git Bash
-pip install -r requirements-dev.txt
-cp .env.example .env            # optional; defaults are sensible
-python -m app.main              # serves http://localhost:8000  (docs at /docs)
+From the repository root in PowerShell:
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements-dev.txt
+Set-Location backend
+..\.venv\Scripts\python.exe -m app.main
 ```
 
-## Tests
+From the repository root in Git Bash:
 
 ```bash
+py -3.12 -m venv .venv
+./.venv/Scripts/python.exe -m pip install -r backend/requirements-dev.txt
 cd backend
-pytest                          # 31 tests, fully offline
+../.venv/Scripts/python.exe -m app.main
+```
+
+The API listens on `http://localhost:8000`. Development OpenAPI documentation is
+available at `http://localhost:8000/docs`.
+
+## API
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api` | Service metadata and documentation location. |
+| `GET` | `/health` | Liveness and cache snapshot. |
+| `GET` | `/api/models` | Curated presets and server capabilities. |
+| `POST` | `/api/models/load` | Load or reuse a model. |
+| `GET` | `/api/models/status?model=` | Read load progress or failure detail. |
+| `GET` | `/api/models/info?model=` | Read vocabulary and embedding dimensions. |
+| `DELETE` | `/api/models?model=` | Evict a cached model. |
+| `POST` | `/api/visualization?model=` | Build or retrieve a UMAP projection. |
+| `GET` | `/api/tokens/search?model=&query=` | Lexically search prepared token text. |
+| `GET` | `/api/tokens/{index}?model=` | Read token metadata. |
+| `GET` | `/api/tokens/{index}/neighbors?model=` | Find nearest neighbors. |
+| `GET` | `/api/tokens/{index}/full?model=` | Read metadata, neighbors, and optional vector. |
+| `POST` | `/api/analysis/compare?model=` | Compare tokens by text. |
+| `POST` | `/api/analysis/compare/by-id?model=` | Compare tokens by analysis index. |
+| `POST` | `/api/analysis/batch?model=` | Build a pairwise similarity matrix. |
+| `GET` | `/api/analysis/statistics?model=` | Summarize the prepared embedding space. |
+
+Example model load:
+
+```bash
+curl -X POST http://localhost:8000/api/models/load \
+  -H "Content-Type: application/json" \
+  -d '{"model":"distilgpt2"}'
+```
+
+Example projection:
+
+```bash
+curl -X POST "http://localhost:8000/api/visualization?model=distilgpt2" \
+  -H "Content-Type: application/json" \
+  -d '{"n_components":3,"n_neighbors":15,"min_dist":0.1,"metric":"cosine"}'
 ```
 
 ## Configuration
 
-All settings are environment variables (see `.env.example`). Notably:
+Copy `.env.example` to `.env` in this directory when overrides are needed.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `CORS_ORIGINS` | `localhost:5173` | Allowed frontend origins |
-| `MAX_CACHED_MODELS` | `2` | LRU model cache size |
-| `MODEL_LOAD_TIMEOUT_SECONDS` | `180` | Hard load timeout |
-| `DEFAULT_TOP_N` | `3000` | Tokens analysed per model |
-| `ALLOWED_MODELS` | *(empty)* | Allow-list for public deploys |
+| `ENVIRONMENT` | `development` | Controls reload and API documentation exposure. |
+| `HOST` | `0.0.0.0` | Bind address. |
+| `PORT` | `8000` | Bind port. |
+| `STATIC_DIR` | empty | Optional compiled frontend directory. |
+| `GZIP_MINIMUM_SIZE` | `1000` | Response compression threshold in bytes. |
+| `CORS_ORIGINS` | local Vite origins | Comma-separated allowed origins. |
+| `MAX_CACHED_MODELS` | `2` | Resident model limit. |
+| `MODEL_LOAD_TIMEOUT_SECONDS` | `180` | Load timeout in seconds. |
+| `DEFAULT_TOP_N` | `6000` | Prepared vocabulary size. |
+| `MAX_CACHED_PROJECTIONS` | `8` | Projection-cache size per model. |
+| `ALLOWED_MODELS` | empty | Optional model repository allow-list. |
 
-For a public deployment, set `ALLOWED_MODELS` to a curated list so visitors
-cannot trigger arbitrary multi-gigabyte downloads.
+Public deployments should set `ALLOWED_MODELS` and size
+`MAX_CACHED_MODELS` according to measured host memory. Arbitrary model loading
+is useful locally but is not an appropriate unrestricted public default.
 
-## API overview
+## Model compatibility and safety
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/health` | Liveness + cache snapshot |
-| `GET` | `/api/models` | List curated presets |
-| `POST` | `/api/models/load` | Load a model (cached, idempotent) |
-| `GET` | `/api/models/status?model=` | Loading status |
-| `GET` | `/api/models/info?model=` | Loaded model details |
-| `DELETE` | `/api/models?model=` | Evict a model |
-| `POST` | `/api/visualization?model=` | Build a UMAP projection |
-| `GET` | `/api/tokens/{i}?model=` | Token details |
-| `GET` | `/api/tokens/{i}/neighbors?model=` | Nearest neighbors |
-| `GET` | `/api/tokens/{i}/full?model=` | Details + neighbors |
-| `GET` | `/api/tokens/search?model=&query=` | Search tokens |
-| `POST` | `/api/analysis/compare?model=` | Compare two tokens by name |
-| `POST` | `/api/analysis/compare/by-id?model=` | Compare two tokens by index |
-| `POST` | `/api/analysis/batch?model=` | Pairwise similarity matrix |
-| `GET` | `/api/analysis/statistics?model=` | Token-space statistics |
+The load request accepts only Hub-style IDs such as `gpt2` or `owner/model`.
+URLs and local paths are rejected. Transformers loads with
+`trust_remote_code=False`, and a compatible model must provide a two-dimensional
+input token embedding table through `get_input_embeddings()`.
 
-Interactive docs (OpenAPI/Swagger) are served at `/docs` in development.
+Unsupported model architectures return typed API errors. A failed load does not
+replace or corrupt another cached model.
 
-## Docker
+## Tests
 
-```bash
-cd backend
-docker build -t embeddings-visualizer-backend .
-docker run -p 8000:8000 -v hf-cache:/cache/huggingface embeddings-visualizer-backend
+The suite uses synthetic embeddings and mocked model loaders; it does not
+download model assets.
+
+```powershell
+Set-Location backend
+..\.venv\Scripts\python.exe -m pytest
 ```
 
-The volume persists the Hugging Face model cache across container restarts.
+Coverage includes numerical operations, whitespace-preserving token handling,
+search and comparison behavior, model LRU eviction, load serialization, timeouts,
+allow-list enforcement, request validation, API routes, and operational headers.
+
+## Production behavior
+
+When `STATIC_DIR` points to a compiled Vite directory, FastAPI serves the SPA
+after registering every API route. This is how the root production Dockerfile
+provides a same-origin deployment.
+
+Production mode hides Swagger and ReDoc. Responses include request and processing
+metadata headers, large JSON payloads are compressed, and the supplied container
+runs as a non-root user. Use one API worker because model and projection caches
+are process-local.
+
+The backend-only `Dockerfile` remains available for split deployments. The root
+`Dockerfile` is preferred when the frontend and API should ship together.

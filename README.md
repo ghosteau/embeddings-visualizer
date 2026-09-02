@@ -1,393 +1,382 @@
 # Embeddings Visualizer
 
-An interactive platform for **exploring token embeddings** from transformer language models — GPT-2, BERT, RoBERTa, and beyond. Load a model, project its 50k+ tokens to 3D space with UMAP, and inspect how the model represents meaning through an interactive 3D point cloud.
+Embeddings Visualizer is an interactive research tool for inspecting the token
+embedding spaces of transformer language models. It loads a model from Hugging
+Face, reduces a representative vocabulary to two or three dimensions with UMAP,
+and renders the result as a searchable Three.js point cloud.
 
-Built for researchers, students, and developers curious about how language models encode semantic meaning.
+The project is designed for researchers, students, and engineers who want to
+understand what a language model places near a token, compare token vectors, or
+export embedding data without first writing an analysis notebook.
 
----
+The interface shares the visual language of
+[mannymcgrail.com](https://mannymcgrail.com): dark navy surfaces, editorial serif
+type, compact technical labels, cyan accents, and restrained motion. Model
+families apply a secondary accent, such as blue for GPT models.
 
-## Features
+## What the application does
 
-### 3D Token Explorer
-- **Interactive 3D point cloud** — drag to orbit, scroll to zoom, click to inspect.
-- **Smooth camera fly-to** — search for a token and the camera smoothly flies to its position in 3D space.
-- **Live neighbor highlighting** — select a token and see its semantically similar neighbors highlighted with glowing halos.
-- **Vocabulary access** — search and inspect any of the top 6,000 most-frequent tokens, even if the visible cloud is lighter.
+- Loads curated GPT-2, BERT, and RoBERTa models or a compatible Hugging Face
+  repository ID.
+- Extracts and caches a model's input embedding table.
+- Projects up to a configured number of tokens with UMAP using cosine or
+  Euclidean distance.
+- Renders a responsive 3D point cloud with orbit, zoom, token selection, and
+  animated camera focus.
+- Searches the full analyzed subset, including points currently hidden by the
+  visible-density control.
+- Inspects token metadata and nearest neighbors.
+- Compares two tokens using cosine similarity and Euclidean distance in the
+  original embedding space.
+- Exports a selected token as JSON and the current projection as CSV.
+- Changes the interface accent by model family while preserving a consistent
+  visual system.
 
-### Search & Comparison
-- **Fast token search** — type a word; jump to it with keyboard shortcut (`/`).
-- **Token comparison** — compare any two tokens side-by-side: cosine similarity, euclidean distance, and shared semantics.
-- **Neighbor analysis** — drill into the 20 nearest semantic neighbors for any token.
+Whitespace is significant in many subword tokenizers. The application preserves
+the raw token text and renders spaces, tabs, and newlines with visible glyphs so
+researchers can distinguish `word` from ` word`.
 
-### Researcher Tools
-- **Export JSON** — download a token's metadata, neighbors, and raw embedding vector for downstream analysis.
-- **Copy token** — quickly copy token text to clipboard.
-- **Vocabulary size display** — see the model's total vocabulary alongside the projected subset.
-- **Keyboard shortcuts** — `/` to search, `Esc` to deselect.
+## Research workflow
 
-### Per-Model Theming
-- **Auto re-themes UI per model family** — GPT/OpenAI models are blue, BERT is Google blue, RoBERTa is violet, custom models are terracotta.
-- **Accent colors** theme the entire UI, buttons, ambient glow, and in-scene neighbor halos.
+1. Select a curated model or enter a Hugging Face repository ID.
+2. Load the model. The first request downloads model assets; later requests use
+   the Hugging Face cache.
+3. Generate a UMAP projection. The first projection for a parameter set is
+   computed once and cached in memory.
+4. Orbit the scene, search for a token, or select a point.
+5. Inspect nearest neighbors, compare tokens, and export the relevant data.
 
-### Performance & Smoothness
-- **Capped DPR rendering** — bloom effect optimized for smooth 60 FPS on high-resolution displays.
-- **UMAP caching** — first projection of a config takes ~20–40s; repeats are instant.
-- **Model caching** — first model download takes ~1–5 min; repeats are instant.
-- **Graceful custom models** — load any Hugging Face model; models without embeddings fail clearly.
-
----
+The visible-point slider only changes how many points WebGL draws. It does not
+discard analyzed tokens, so the complete prepared subset remains searchable and
+comparable.
 
 ## Architecture
 
+```text
+Browser
+  React + TypeScript + Zustand
+  react-three-fiber + Three.js
+          |
+          | typed JSON over HTTP
+          v
+FastAPI application
+  model lifecycle and validation
+  token search and vector analysis
+  UMAP projection worker
+          |
+          v
+Model-keyed LRU cache
+  Hugging Face tokenizer
+  input embedding matrix
+  cached projection configurations
 ```
+
+### Frontend
+
+The frontend is a Vite application built with React, strict TypeScript,
+Tailwind CSS, Zustand, Three.js, and react-three-fiber.
+
+- The WebGL scene is loaded as a separate JavaScript chunk, so the application
+  shell can become interactive before Three.js finishes loading.
+- Rendering uses an on-demand frame loop and a capped device-pixel ratio to
+  avoid spending GPU time on unchanged frames or excessive high-DPI pixels.
+- Neighbor markers are instanced, reducing them to one draw call.
+- Request sequence guards prevent stale search and token-detail responses from
+  replacing newer user intent.
+- Mobile and lower-concurrency devices start with fewer visible points while
+  retaining access to the full analyzed token set.
+- Production API calls default to the current origin. Development defaults to
+  `http://localhost:8000` and can be overridden with `VITE_API_URL`.
+
+See [frontend/README.md](frontend/README.md) for frontend-specific notes.
+
+### Backend
+
+The backend is a FastAPI service with validated Pydantic contracts and a
+model-keyed LRU cache.
+
+- A per-model asynchronous lock collapses concurrent requests for the same
+  model into one load.
+- Model loading runs outside the event loop and is bounded by a real timeout.
+- CPU-bound UMAP work runs in a worker thread, so health and status requests
+  remain responsive during projection.
+- Normalized embeddings are computed once and reused for cosine operations.
+- Neighbor search and batch similarity use vectorized NumPy operations.
+- Projection results are cached by model and UMAP configuration.
+- GZip compresses large projection payloads.
+- Request IDs, process timing, content-type protection, and referrer-policy
+  headers are attached to responses.
+- Domain errors map to stable JSON error responses instead of leaking internal
+  exceptions.
+
+See [backend/README.md](backend/README.md) for backend internals and the complete
+API table.
+
+## Repository layout
+
+```text
 embeddings-visualizer/
-├── backend/           # FastAPI service
-│   ├── app/
-│   │   ├── main.py              # FastAPI app factory, lifespan, exception handlers
-│   │   ├── config.py            # Settings (pydantic-settings): env, cache, allowed models
-│   │   ├── schemas.py           # Pydantic models (API contracts)
-│   │   ├── core/
-│   │   │   ├── model_manager.py # LRU model cache, async loads, per-model locks
-│   │   │   ├── visualizer.py    # LoadedModel: vectorized neighbors, UMAP, statistics
-│   │   │   └── exceptions.py    # Typed domain errors → HTTP statuses
-│   │   └── api/                 # Router endpoints
-│   │       ├── models.py        # POST /api/models/load, GET /api/models/status
-│   │       ├── visualization.py # POST /api/visualizations
-│   │       ├── tokens.py        # GET /api/tokens/search, /api/tokens/{idx}/full
-│   │       ├── analysis.py      # POST /api/analysis/compare, /api/analysis/statistics
-│   │       └── health.py        # GET /health
-│   ├── tests/                   # 33 offline pytest tests
-│   ├── requirements-dev.txt
-│   ├── Dockerfile
-│   └── .env.example
-│
-├── frontend/          # React + Vite + Three.js
-│   ├── src/
-│   │   ├── App.tsx               # Root component, keyboard shortcuts
-│   │   ├── index.css             # Tailwind + custom CSS (instrument panels, vignette)
-│   │   ├── components/
-│   │   │   ├── scene/
-│   │   │   │   ├── EmbeddingCanvas.tsx  # WebGL canvas, post-processing bloom, camera rig
-│   │   │   │   └── PointCloud.tsx       # Three.js point geometry, selection, halos
-│   │   │   ├── ControlRail.tsx          # Left sidebar: model picker, UMAP settings, search
-│   │   │   ├── DetailPanel.tsx          # Right sidebar: token metadata, neighbors, export
-│   │   │   ├── SearchPanel.tsx          # Search input + results
-│   │   │   ├── ComparePanel.tsx         # Token comparison inputs
-│   │   │   ├── Legend.tsx               # Stats: vocab size, dims, metric
-│   │   │   ├── Logo.tsx                 # Custom SVG constellation mark
-│   │   │   ├── WelcomeOverlay.tsx       # Loading screen
-│   │   │   └── ...
-│   │   ├── lib/
-│   │   │   ├── api.ts                   # Typed API client
-│   │   │   ├── types.ts                 # TS mirrors of backend Pydantic schemas
-│   │   │   ├── modelTheme.ts            # Per-model accent color map & applier
-│   │   │   ├── layout.ts                # normalizeCoordinates, pointAt
-│   │   │   └── tokenColors.ts           # Token-type color palette
-│   │   └── store/
-│   │       └── useStore.ts              # Zustand: app state, async workflows, focus/search
-│   ├── package.json
-│   ├── tailwind.config.js
-│   └── vite.config.ts
-│
-├── RUNNING.md         # Local + PyCharm setup guide
-├── README.md          # This file
-└── .env.example       # Environment variables template
+|-- backend/
+|   |-- app/
+|   |   |-- api/                 FastAPI route modules
+|   |   |-- core/                Model manager and embedding analysis
+|   |   |-- config.py            Environment-driven settings
+|   |   |-- main.py              Application factory and entry point
+|   |   `-- schemas.py           Request and response contracts
+|   |-- tests/                   Offline API and numerical tests
+|   `-- requirements*.txt
+|-- frontend/
+|   |-- public/                  Static assets
+|   |-- src/
+|   |   |-- components/          Workbench UI and Three.js scene
+|   |   |-- lib/                 API, types, layout, and model themes
+|   |   `-- store/               Zustand application state
+|   `-- package.json
+|-- deploy/
+|   `-- Caddyfile.example        TLS reverse-proxy example
+|-- Dockerfile                   Combined production image
+|-- docker-compose.yml           Single-host deployment definition
+|-- RUNNING.md                   Local and PyCharm command sheet
+`-- README.md
 ```
 
-### Backend: Model-Keyed LRU Cache
+## Prerequisites
 
-Every API request names the model it operates on (`?model=distilgpt2`). Models are
-loaded into a **memory-capped LRU cache** (default 2 models) shared across all users.
-This is safe, efficient, and fits well with multi-user hosting. See
-[`backend/README.md`](backend/README.md) for full API docs and design details.
+- Python 3.12
+- Node.js 24 and npm
+- Git
+- Internet access for the first download of each Hugging Face model
 
-**Key safeguards:**
-- Per-model **async locks** prevent concurrent loads of the same model.
-- **Real asyncio.wait_for timeouts** (not threading tricks) kill slow/hung downloads.
-- **UMAP projection cache** (per config) avoids redundant computation.
-- **Typed domain exceptions** map to clear HTTP errors (400, 404, 503, etc.).
+Docker is optional for local development and recommended for the production
+configuration included in this repository.
 
-### Frontend: React + Three.js Explorer
+## Quick start
 
-A **full-screen WebGL canvas** (Three.js + react-three-fiber) sits behind a layer of
-floating glass panels. The 3D scene is always interactive (drag/zoom); panels overlay
-with `pointer-events` controls. Camera smoothly flies to tokens on selection; neighbor
-halos re-theme per model. State lives in Zustand; async API calls are orchestrated
-there, not in React.
+Run the backend and frontend in separate terminals from the repository root.
+The commands below deliberately use the virtual environment's Python executable
+directly, so shell activation is optional.
 
----
+### PowerShell
 
-## Quick Start
+One-time setup:
 
-### One-time setup
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r backend\requirements-dev.txt
+Set-Location frontend
+npm install
+Set-Location ..
+```
+
+Backend terminal:
+
+```powershell
+Set-Location C:\path\to\embeddings-visualizer\backend
+..\.venv\Scripts\python.exe -m app.main
+```
+
+Frontend terminal:
+
+```powershell
+Set-Location C:\path\to\embeddings-visualizer\frontend
+npm run dev
+```
+
+### Git Bash on Windows
+
+One-time setup:
 
 ```bash
-# From the project root:
-
-# 1) Python deps
-.\.venv\Scripts\python.exe -m pip install -r backend\requirements-dev.txt
-
-# 2) Frontend deps
+py -3.12 -m venv .venv
+./.venv/Scripts/python.exe -m pip install --upgrade pip
+./.venv/Scripts/python.exe -m pip install -r backend/requirements-dev.txt
 cd frontend
 npm install
 cd ..
 ```
 
-### Start both servers
+Backend terminal:
 
-**Terminal 1 — Backend (FastAPI on :8000)**
 ```bash
-.\.venv\Scripts\Activate.ps1      # PowerShell: activate venv
-cd backend
-python -m app.main
+cd /c/path/to/embeddings-visualizer/backend
+../.venv/Scripts/python.exe -m app.main
 ```
 
-Or in **Git Bash / Linux**:
-```bash
-source .venv/Scripts/activate      # Git Bash: activate venv
-cd backend
-python -m app.main
-```
+Frontend terminal:
 
-**Terminal 2 — Frontend (Vite on :5173)**
 ```bash
-cd frontend
+cd /c/path/to/embeddings-visualizer/frontend
 npm run dev
 ```
 
-Open **http://localhost:5173**, pick a model, click **Load & visualize**.
+Open [http://localhost:5173](http://localhost:5173). The API is available at
+[http://localhost:8000](http://localhost:8000), with interactive documentation
+at [http://localhost:8000/docs](http://localhost:8000/docs) in development.
 
-**See [`RUNNING.md`](RUNNING.md) for PyCharm setup, Docker, and troubleshooting.**
+For shell activation, PyCharm run configurations, Docker commands, and common
+errors, use the comprehensive [RUNNING.md](RUNNING.md) command sheet.
 
----
+## Configuration
 
-## Usage
+Copy `backend/.env.example` to `backend/.env` when defaults need to change.
+The backend reads this file from its working directory.
 
-### Exploring the point cloud
-- **Drag** to orbit the camera.
-- **Scroll** to zoom in/out.
-- **Click a point** to inspect its token, see neighbors, and export.
-- **Click empty space** to deselect (or press `Esc`).
-
-### Finding tokens
-- Press `/` (or click the search box) and type a token.
-- Results list semantically similar tokens; click one to fly the camera to it.
-
-### Comparing tokens
-- Type two token names in the "Compare" section (bottom-left).
-- See their cosine similarity, euclidean distance, and shared neighbors.
-- Click a result chip to inspect it.
-
-### Exporting for research
-- Select a token (click it in the point cloud or via search).
-- In the detail panel (right sidebar), click **Export JSON**.
-- Downloads `{model}_{token}.json` with metadata, neighbors (up to 50), and raw embedding vector.
-- Also **Copy token** to clipboard.
-
-### Changing the visible density
-- Drag the **Visible points** slider (left panel) to show fewer points for clarity.
-- All 6,000 tokens remain searchable; the slider only affects rendering.
-
-### Adjusting the projection
-- **UMAP metric**: toggle between `cosine` (default) and `euclidean` distance.
-- **Neighbors per token** (slider): re-computes the UMAP graph; projection cached.
-- **Re-project** button: force a fresh projection (useful if you changed settings).
-
----
-
-## API Endpoints
-
-All requests are **model-keyed** (`?model=gpt2`, `?model=bert-base-uncased`, etc.).
-
-### Model Management
-- `POST /api/models/load?model={model_id}` — Load a model (async, polling `/status` for progress).
-- `GET /api/models/status?model={model_id}` — Get load state, progress, or error.
-- `GET /api/models/list` — List available presets and custom model slot.
-
-### Visualization
-- `POST /api/visualizations?model={model_id}` (JSON body: `{n_components, n_neighbors, min_dist, metric}`) — Compute or retrieve cached UMAP projection.
-
-### Tokens
-- `GET /api/tokens/search?model={model_id}&query={text}&max_results={n}` — Search for tokens by substring/prefix.
-- `GET /api/tokens/{index}/full?model={model_id}&n_neighbors=20&metric=cosine&include_embedding=true` — Get token details + neighbors + optionally the raw embedding vector.
-
-### Analysis
-- `POST /api/analysis/compare?model={model_id}` (JSON: `{token1, token2}`) — Compare two tokens.
-- `GET /api/analysis/statistics?model={model_id}` — Get model vocab size and other stats.
-
-### Health
-- `GET /health` — Service status.
-
-**Full API docs** (when running locally): http://localhost:8000/docs (Swagger UI).
-
----
-
-## Development
-
-### Run tests (backend)
-```bash
-cd backend
-python -m pytest -v          # verbose
-python -m pytest --cov       # with coverage
-```
-
-All tests are **offline** (no network, no model downloads). We use synthetic data and
-mocked Hugging Face calls.
-
-### TypeScript compilation (frontend)
-```bash
-cd frontend
-npx tsc -b                   # type-check
-npm run build                # production build → dist/
-```
-
-### Code style
-- **Backend:** Black-formatted, type-hinted with Pydantic, FastAPI best practices.
-- **Frontend:** Prettier, ESLint, Tailwind CSS, TypeScript strict mode.
-
-### Common dev tasks
-| Task | Command |
-| --- | --- |
-| Backend with auto-reload | `python -m app.main` (already enabled via Uvicorn) |
-| Frontend hot-reload | `npm run dev` (Vite HMR) |
-| Type-check frontend only | `cd frontend && npx tsc --noEmit` |
-| Rebuild frontend CSS | `npm run build` (if Tailwind config changed, restart dev server) |
-| Lint Python | `cd backend && black . && isort .` |
-| Format TypeScript | `cd frontend && npx prettier --write src/` |
-
----
-
-## Design & Theming
-
-### Per-Model Colors
-
-The UI accent is **CSS-variable driven** and re-themes on model load:
-
-| Model Family | Accent | Hex |
+| Variable | Default | Purpose |
 | --- | --- | --- |
-| GPT / OpenAI | Blue | `#3b82f6` |
-| BERT | Blue-gray | `#4284f4` |
-| RoBERTa | Violet | `#7c61ff` |
-| Custom / Other | Terracotta | `#d8623a` |
+| `ENVIRONMENT` | `development` | Enables reload and development API docs; use `production` when deployed. |
+| `HOST` | `0.0.0.0` | API bind address. |
+| `PORT` | `8000` | API port. |
+| `STATIC_DIR` | empty | Compiled frontend directory for same-origin serving. |
+| `GZIP_MINIMUM_SIZE` | `1000` | Minimum response size to compress. |
+| `CORS_ORIGINS` | local Vite origins | Comma-separated allowed frontend origins. |
+| `MAX_CACHED_MODELS` | `2` | Maximum resident models before LRU eviction. |
+| `MODEL_LOAD_TIMEOUT_SECONDS` | `180` | Hard limit for one model load. |
+| `DEFAULT_TOP_N` | `6000` | Number of vocabulary entries prepared for analysis. |
+| `MAX_CACHED_PROJECTIONS` | `8` | Cached UMAP configurations per model. |
+| `ALLOWED_MODELS` | empty | Optional comma-separated public deployment allow-list. |
 
-See [`frontend/src/lib/modelTheme.ts`](frontend/src/lib/modelTheme.ts) to add more families.
+For a split frontend/API deployment, copy `frontend/.env.example` to
+`frontend/.env` and set `VITE_API_URL` to the public API origin. The included
+production image does not require this because it serves both layers from the
+same origin.
 
-### Instrument-Style UI
+## Custom model compatibility
 
-Panels use crisp box-shadows, hairline borders, and subtle tick-mark labels. No frosted
-glass or gradients — clean, minimal, distinctive.
+Local development accepts a Hugging Face repository ID such as `gpt2` or
+`organization/model-name`. URLs and filesystem paths are rejected.
 
----
+A model is compatible when Transformers can load both its tokenizer and model,
+and `get_input_embeddings()` returns a two-dimensional token embedding table.
+Standard text transformer models generally satisfy this contract. Models built
+only for vision, audio, or another modality may not expose token embeddings.
+Those cases return a clear load error and do not crash the server or replace an
+already cached model.
 
-## Deployment
+`trust_remote_code` is disabled. Models that require executing repository code
+are intentionally unsupported by the public-facing loader.
 
-### Docker (Backend)
+For a public deployment, set `ALLOWED_MODELS`. Leaving arbitrary model loading
+enabled lets visitors initiate large downloads and memory allocations.
 
-```bash
-cd backend
-docker build -t embeddings-viz .
-docker run -p 8000:8000 \
-  -e CORS_ORIGINS=https://yourdomain.com \
-  -e ALLOWED_MODELS=gpt2,distilgpt2,bert-base-uncased \
-  embeddings-viz
+## API overview
+
+Every analysis route identifies the loaded model with `?model=<repository-id>`.
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/api` | Service metadata and documentation location. |
+| `GET` | `/health` | Service health and cache status. |
+| `GET` | `/api/models` | Curated presets and custom-model capability. |
+| `POST` | `/api/models/load` | Load or reuse a model. Body: `{ "model": "gpt2" }`. |
+| `GET` | `/api/models/status?model=gpt2` | Poll model load state. |
+| `GET` | `/api/models/info?model=gpt2` | Inspect loaded model dimensions. |
+| `DELETE` | `/api/models?model=gpt2` | Evict a cached model. |
+| `POST` | `/api/visualization?model=gpt2` | Build or retrieve a UMAP projection. |
+| `GET` | `/api/tokens/search?model=gpt2&query=king` | Search prepared token text. |
+| `GET` | `/api/tokens/{index}?model=gpt2` | Read token metadata. |
+| `GET` | `/api/tokens/{index}/neighbors?model=gpt2` | Read nearest neighbors. |
+| `GET` | `/api/tokens/{index}/full?model=gpt2` | Read metadata, neighbors, and optional vector. |
+| `POST` | `/api/analysis/compare?model=gpt2` | Compare two tokens by text. |
+| `POST` | `/api/analysis/compare/by-id?model=gpt2` | Compare two tokens by analysis index. |
+| `POST` | `/api/analysis/batch?model=gpt2` | Build a pairwise cosine-similarity matrix. |
+| `GET` | `/api/analysis/statistics?model=gpt2` | Summarize the prepared token space. |
+
+## Verification
+
+Backend tests use synthetic models and run without network access:
+
+```powershell
+Set-Location backend
+..\.venv\Scripts\python.exe -m pytest
 ```
 
-### Static Frontend (Production Build)
+Frontend verification:
 
-```bash
-cd frontend
-npm run build                # outputs dist/
-# Serve dist/ via any static host (Vercel, Netlify, S3 + CloudFront, etc.)
+```powershell
+Set-Location frontend
+npm run lint
+npm run build
 ```
 
-### Environment Variables
+The production build runs strict TypeScript compilation before Vite bundles the
+application.
 
-See [`.env.example`](.env.example) for backend config:
-- `DEFAULT_TOP_N` — token cap (default 6000).
-- `MAX_CACHED_MODELS` — LRU cache size (default 2).
-- `MODEL_LOAD_TIMEOUT_SECONDS` — hard timeout for downloads (default 180s).
-- `ALLOWED_MODELS` — optional allow-list (leave empty to allow any Hugging Face model).
-- `CORS_ORIGINS` — frontend URL(s).
+## Production deployment on mannymcgrail.com
 
----
+The cleanest deployment is a dedicated subdomain such as
+`embeddings.mannymcgrail.com`. The root Dockerfile builds the frontend and then
+serves both the static application and FastAPI routes from one container and one
+origin. This avoids cross-origin configuration and keeps the deployment simple.
 
-## Understanding the Code
+The included Compose configuration assumes:
 
-### Why per-model caching?
+- a Linux host with Docker Compose;
+- at least 8 GB of memory for the curated model set;
+- an `A` or `AAAA` DNS record for `embeddings.mannymcgrail.com` pointing at the
+  host;
+- Caddy on the host for TLS termination and reverse proxying.
 
-When hosting for many users, a single global model would be a bottleneck (one user
-waiting for a slow load blocks everyone). An LRU cache lets us hold 2–3 models at a
-time, with older models swapped out. Each model has a per-slot async lock, so
-concurrent `/load` requests don't download twice.
+Build and start the application from the repository root:
 
-### Why UMAP on the backend?
+```bash
+git checkout dev
+docker compose build
+docker compose up -d
+docker compose ps
+docker compose logs -f embeddings-visualizer
+```
 
-UMAP is expensive (~1 min for 6000 tokens). We compute it server-side once, cache
-the result (keyed by config), and serve the pre-computed coordinates to all clients.
-The frontend only downloads the coords and renders; no client-side recomputation.
+Verify the service on the host before configuring the proxy:
 
-### Why Zustand for state?
+```bash
+curl http://127.0.0.1:8000/health
+```
 
-Zustand keeps the async model-loading workflow and search/selection state in one
-place, declarative and easy to debug. All API calls flow through actions, so the UI
-is a pure function of `store.getState()`.
+Use `deploy/Caddyfile.example` as the site block for Caddy, then validate and
+reload Caddy:
 
-### Why Three.js + react-three-fiber?
+```bash
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+curl https://embeddings.mannymcgrail.com/health
+```
 
-Three.js is battle-tested for large point clouds (3D-6D scenes, smooth interaction).
-react-three-fiber (r3f) lets us compose 3D scenes declaratively in React, bridging
-the procedural Three.js world and React's component model.
+The Compose service binds FastAPI to `127.0.0.1:8000`, so it is not directly
+exposed to the public internet. Caddy is the public entry point and provisions
+TLS certificates. The Hugging Face cache is stored in a named Docker volume and
+survives application image rebuilds.
 
----
+Before a public launch:
 
-## Contributing
+- keep `ALLOWED_MODELS` limited to models that fit the host;
+- keep `MAX_CACHED_MODELS=1` unless memory measurements justify more;
+- place rate limiting or access control at the reverse proxy if traffic is
+  untrusted;
+- monitor memory, disk use, model-download time, and projection latency;
+- review each model's license before making it available;
+- back up deployment configuration, not the disposable model cache.
 
-Contributions welcome! Areas for exploration:
+No production deployment is performed automatically by this repository.
 
-- **2D UMAP mode** — an alternative to 3D for performance or preference.
-- **Custom color schemes** — expose theme config to the UI.
-- **Batch export** — download multiple tokens' embeddings at once.
-- **Token analogies** — "king is to man as queen is to ?" interface.
-- **API authentication** — for multi-user deployments.
-- **Embedding arithmetic** — visualize the result of `embedding_a - embedding_b + embedding_c`.
+## Operational characteristics and limitations
 
----
+- The first model load requires a download and can take several minutes.
+- The first UMAP projection for a model/configuration is CPU intensive. Cached
+  repeats are much faster.
+- In-memory model and projection caches are process-local. Multiple API workers
+  do not share them, so the supplied container intentionally uses one worker.
+- `DEFAULT_TOP_N` controls the analyzed vocabulary subset, not merely the number
+  of points shown. Increasing it raises memory, CPU, and payload costs.
+- Token search is lexical substring search. Semantic relationships come from
+  nearest-neighbor and comparison operations, not the search ranking.
+- UMAP is an exploratory projection. Apparent 3D distance is not a substitute
+  for measurement in the original embedding space; the inspector and compare
+  tools report original-space metrics for that reason.
 
-## License & Attribution
+## Project
 
-- **Manny McGrail** — Project direction, backend API, ML module.
-- **Claude (Anthropic)** — Backend remaster (model-keyed LRU, async timeouts, typed errors), full frontend (React/Three.js, UMAP caching, keyboard shortcuts, theming, export/search/compare workflows).
+Designed and maintained by [Emmanuel McGrail](https://mannymcgrail.com).
 
----
-
-## Related Work
-
-- **Hugging Face Transformers** — model loading and tokenization.
-- **UMAP** — dimensionality reduction.
-- **react-three-fiber** — declarative Three.js.
-- **Zustand** — lightweight state management.
-
----
-
-## FAQ
-
-**Q: Can I load my own model?**
-A: Yes. Type any Hugging Face model ID (e.g., `sentence-transformers/all-MiniLM-L6-v2`) in the "custom" field. If the model exports a token embedding table, it works. Vision/audio/other architectures fail clearly.
-
-**Q: How long does the first load take?**
-A: Model download: 1–5 min (cached after). UMAP projection (6000 tokens): 20–40s (cached after). Repeats are instant.
-
-**Q: Can I use this offline?**
-A: The backend requires a Hugging Face download (unless you use `HF_HUB_OFFLINE=1` with pre-cached models). The frontend works offline once loaded.
-
-**Q: Can I compare tokens that aren't in the top 6000?**
-A: Not directly — the projection is built from the top 6000. To include more, raise `DEFAULT_TOP_N` in `.env` (will slow projection).
-
-**Q: Why does the theme color not change immediately when I switch models?**
-A: Real browsers re-resolve `var(--accent)` instantly. If you're in the Claude Code preview (headless), there's a browser caching quirk — the accent *is* being set correctly (you'll see it in the real browser).
-
----
-
-## Questions?
-
-Open an issue on GitHub or reach out to the maintainers. Enjoy exploring!
+The project does not currently declare an open-source license. Add one before
+inviting unrestricted redistribution or outside contributions.

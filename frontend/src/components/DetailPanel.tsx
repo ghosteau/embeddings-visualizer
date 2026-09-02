@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { useStore } from "../store/useStore";
 import { api } from "../lib/api";
+import { formatToken, tokenSlug } from "../lib/tokenFormat";
 import { TOKEN_COLORS } from "../lib/tokenColors";
 import { SegToggle, Stat } from "./ui";
 import { Logo } from "./Logo";
@@ -25,12 +26,22 @@ export function DetailPanel() {
 
   if (!detail) {
     return (
-      <div className="flex h-full flex-col items-center justify-center px-8 text-center">
-        <Logo size={34} className="mb-4 text-faint opacity-50" />
-        <p className="text-sm leading-relaxed text-muted">
-          Click a point — or search a token — to inspect its metadata and nearest
-          neighbors.
-        </p>
+      <div className="flex h-full flex-col">
+        <div className="inspector-heading">
+          <span className="eyebrow">INSPECTOR / IDLE</span>
+          <h2 className="mt-2 font-display text-2xl text-paper">Read the local structure.</h2>
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+          <Logo size={32} className="mb-5 text-faint opacity-45" />
+          <p className="max-w-[240px] text-sm leading-relaxed text-muted">
+            Select a point or search a token to inspect its vocabulary metadata and nearest
+            neighbors.
+          </p>
+          <div className="mt-6 grid w-full max-w-[240px] grid-cols-2 gap-2 text-left">
+            <Stat label="Select" value="point" />
+            <Stat label="Search" value="/ key" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -62,7 +73,7 @@ export function DetailPanel() {
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      const safe = (d.token.trim() || `token_${d.index}`).replace(/[^a-z0-9_-]+/gi, "_");
+      const safe = tokenSlug(d.token, `token_${d.index}`);
       a.href = url;
       a.download = `${loadedModel.replace(/[^a-z0-9]+/gi, "_")}_${safe}.json`;
       a.click();
@@ -76,12 +87,12 @@ export function DetailPanel() {
   };
 
   return (
-    <div className="scroll-thin flex h-full flex-col gap-4 overflow-y-auto p-4">
-      <div className="flex items-start justify-between gap-2">
+    <div className="scroll-thin flex h-full flex-col gap-5 overflow-y-auto p-5">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="panel-header px-0 pt-0">Selected token</div>
-          <div className="break-all font-mono text-2xl font-semibold text-paper">
-            {d.token.trim() === "" ? JSON.stringify(d.token) : d.token}
+          <div className="eyebrow">TOKEN / {String(d.index).padStart(4, "0")}</div>
+          <div className="mt-2 break-all font-mono text-2xl font-semibold text-paper">
+            {formatToken(d.token)}
           </div>
         </div>
         <button onClick={clearSelection} className="btn-ghost shrink-0 px-2 py-1 text-xs">
@@ -115,17 +126,26 @@ export function DetailPanel() {
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <Stat label="Index" value={d.index} />
-        <Stat label="Freq. rank" value={d.frequency_rank.toLocaleString()} />
+        <Stat label="Analysis index" value={d.index} />
+        <Stat label="Vocabulary id" value={d.frequency_rank.toLocaleString()} />
         <Stat label="Length" value={d.length} />
-        <Stat label="norm" value={d.embedding_norm.toFixed(3)} />
+        <Stat label="L2 norm" value={d.embedding_norm.toFixed(3)} />
       </div>
+
+      {d.x != null && d.y != null && (
+        <div>
+          <div className="eyebrow mb-2">ACTIVE PROJECTION</div>
+          <div className="grid grid-cols-3 gap-2">
+            <Stat label="X" value={d.x.toFixed(2)} />
+            <Stat label="Y" value={d.y.toFixed(2)} />
+            <Stat label="Z" value={(d.z ?? 0).toFixed(2)} />
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="font-mono text-[10px] font-medium uppercase tracking-widest2 text-faint">
-            Nearest neighbors
-          </span>
+          <span className="eyebrow">NEAREST NEIGHBORS</span>
           {detailLoading && <span className="font-mono text-[10px] text-faint">updating…</span>}
         </div>
         <SegToggle<DistanceMetric>
@@ -141,11 +161,11 @@ export function DetailPanel() {
             <li key={n.index}>
               <button
                 onClick={() => focusOn(n.index)}
-                className="group flex w-full items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-white/[0.07]"
+                className="result-row group"
               >
                 <span className="w-4 text-right font-mono text-xs text-faint">{i + 1}</span>
                 <span className="flex-1 truncate font-mono text-sm text-paper">
-                  {n.token.trim() === "" ? JSON.stringify(n.token) : n.token}
+                  {formatToken(n.token)}
                 </span>
                 <span className="font-mono text-xs text-accent-glow">
                   {neighborMetric === "cosine" ? n.similarity.toFixed(3) : n.distance.toFixed(2)}

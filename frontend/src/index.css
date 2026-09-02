@@ -1,16 +1,18 @@
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap");
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* Accent channels ("R G B"), re-themed per model at runtime. Default is the
-       terracotta signature; see src/lib/modelTheme.ts. */
-    --accent: 216 98 58;
-    --accent-soft: 232 127 90;
-    --accent-glow: 240 161 132;
+    --accent: 82 198 229;
+    --accent-soft: 121 216 239;
+    --accent-glow: 154 229 246;
+    color-scheme: dark;
+    font-synthesis: none;
+  }
+
+  * {
+    box-sizing: border-box;
   }
 
   html,
@@ -21,64 +23,381 @@
   }
 
   body {
-    @apply bg-ink-950 text-paper font-sans antialiased;
-    overflow: hidden; /* the app manages its own scroll regions */
+    @apply overflow-hidden bg-ink-950 font-sans text-paper antialiased;
   }
 
-  /* Subtle film-grain-free vignette so panels read against the 3D scene. */
-  #root {
-    background: radial-gradient(120% 120% at 50% 0%, rgba(216, 98, 58, 0.05), transparent 55%);
+  button,
+  input,
+  select {
+    font: inherit;
+  }
+
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  ::selection {
+    background: rgb(var(--accent) / 0.28);
+    color: #fff;
   }
 }
 
 @layer components {
-  /* Instrument-style panel: solid, hairline-bordered, crisp — not frosted glass. */
-  .panel {
-    @apply rounded-lg border border-white/10 bg-ink-900/95 shadow-panel;
+  .app-shell {
+    @apply relative flex h-full min-h-0 flex-col overflow-hidden bg-ink-950;
+    background-image:
+      radial-gradient(circle at 48% -20%, rgb(var(--accent) / 0.08), transparent 34%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.012), transparent 22%);
+  }
+
+  .topbar {
+    @apply relative z-40 mx-3 mt-3 flex h-[62px] shrink-0 items-center justify-between gap-4 rounded-[20px] border border-line bg-ink-950/95 px-4 shadow-panel;
+  }
+
+  .brand-mark {
+    @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-accent/25 bg-accent/[0.06] text-accent;
+  }
+
+  .portfolio-link {
+    @apply items-center gap-1.5 rounded-full border border-line px-3 py-1.5 font-mono text-[10px] uppercase tracking-widest2 text-muted transition hover:border-accent/35 hover:text-paper;
+  }
+
+  .workspace {
+    @apply relative grid min-h-0 flex-1 gap-3 p-3;
+    grid-template-columns: 316px minmax(0, 1fr) 340px;
+  }
+
+  .control-drawer,
+  .inspector-column,
+  .canvas-stage {
+    @apply min-h-0 overflow-hidden rounded-[20px] border border-line bg-ink-900 shadow-panel;
+  }
+
+  .control-rail {
+    @apply scroll-thin h-full overflow-y-auto divide-y divide-line;
+  }
+
+  .rail-section {
+    @apply bg-ink-900/95;
+  }
+
+  .inspector-column {
+    @apply block;
+  }
+
+  .canvas-stage {
+    @apply relative isolate;
+    background:
+      radial-gradient(circle at 50% 40%, rgb(var(--accent) / 0.055), transparent 38%),
+      #050d17;
+  }
+
+  .canvas-grid {
+    @apply pointer-events-none absolute inset-0 z-[-1] opacity-25;
+    background-image:
+      linear-gradient(rgba(121, 180, 211, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(121, 180, 211, 0.06) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(circle at center, black, transparent 82%);
+  }
+
+  .canvas-loading {
+    @apply absolute inset-0 flex items-center justify-center font-mono text-xs uppercase tracking-widest2 text-faint;
+  }
+
+  .canvas-legend {
+    @apply pointer-events-none absolute bottom-4 left-4 z-10;
+  }
+
+  .canvas-hint {
+    @apply pointer-events-none absolute bottom-4 left-1/2 hidden -translate-x-1/2 whitespace-nowrap font-mono text-[9px] uppercase tracking-widest2 text-faint md:block;
+  }
+
+  .legend-panel {
+    @apply pointer-events-auto w-[300px] rounded-2xl border border-line bg-ink-950/90 p-3.5 shadow-panel;
+  }
+
+  .mobile-inspector {
+    @apply fixed bottom-3 right-3 top-[86px] z-30 hidden w-[340px] overflow-hidden rounded-[20px] border border-line bg-ink-900 shadow-panel;
+  }
+
+  .drawer-scrim {
+    @apply fixed inset-0 z-30 bg-black/65 lg:hidden;
   }
 
   .panel-header {
-    @apply flex items-center gap-2 px-4 pt-4 pb-2 font-mono text-[10px] font-medium uppercase tracking-widest2 text-faint;
+    @apply flex items-center gap-1.5 px-4 pb-3 pt-4 font-mono text-[9px] font-medium uppercase tracking-widest2 text-faint;
   }
 
-  /* A small tick that precedes section labels, reinforcing the instrument feel. */
-  .panel-header::before {
-    content: "";
-    @apply h-2 w-px bg-accent;
+  .panel-header span:first-child {
+    @apply text-accent;
+  }
+
+  .eyebrow {
+    @apply font-mono text-[9px] font-medium uppercase tracking-widest2 text-accent;
+  }
+
+  .status-cluster {
+    @apply flex shrink-0 items-center gap-2 font-mono text-[10px] uppercase tracking-widest2 text-muted;
+  }
+
+  .status-dot {
+    @apply block h-1.5 w-1.5 rounded-full bg-faint;
+  }
+
+  .status-dot--ready {
+    @apply bg-cyan-300;
+    box-shadow: 0 0 8px rgba(103, 232, 249, 0.65);
+  }
+
+  .status-dot--loading,
+  .status-dot--visualizing {
+    @apply animate-pulse bg-accent;
+    box-shadow: 0 0 8px rgb(var(--accent) / 0.65);
+  }
+
+  .status-dot--error {
+    @apply bg-red-400;
   }
 
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium
-           outline-none transition-all duration-150 focus-visible:ring-2 focus-visible:ring-accent/50
-           disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium outline-none transition duration-150 focus-visible:ring-2 focus-visible:ring-accent/50 disabled:cursor-not-allowed disabled:opacity-40;
   }
 
   .btn-primary {
-    @apply btn bg-accent font-semibold text-accent-ink hover:bg-accent-soft hover:shadow-accent active:translate-y-px;
+    @apply btn border border-accent/55 bg-accent text-accent-ink shadow-accent hover:bg-accent-soft active:translate-y-px;
   }
 
   .btn-ghost {
-    @apply btn border border-white/10 bg-white/[0.03] text-paper hover:border-white/20 hover:bg-white/[0.07];
+    @apply btn border border-line bg-ink-800/70 text-paper hover:border-line-strong hover:bg-ink-700/70;
   }
 
   .input {
-    @apply w-full rounded-md border border-white/10 bg-ink-950/80 px-3 py-2 text-sm text-paper
-           placeholder:text-faint outline-none transition focus:border-accent/70 focus:ring-1 focus:ring-accent/40;
+    @apply w-full rounded-lg border border-line bg-ink-950/75 px-3 py-2.5 text-sm text-paper outline-none transition placeholder:text-faint focus:border-accent/55 focus:ring-1 focus:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-45;
+  }
+
+  select.input {
+    @apply cursor-pointer;
+  }
+
+  .segmented-control {
+    @apply flex rounded-lg border border-line bg-ink-950/60 p-0.5;
+  }
+
+  .segmented-control button {
+    @apply flex-1 rounded-md px-2 py-1.5 text-xs font-medium outline-none transition focus-visible:ring-1 focus-visible:ring-accent/50;
+  }
+
+  .segmented-control--active {
+    @apply bg-accent font-semibold text-accent-ink;
+  }
+
+  .range-input {
+    @apply h-1.5 w-full cursor-pointer appearance-none rounded-full bg-ink-600 accent-accent;
   }
 
   .chip {
-    @apply inline-flex items-center gap-1 rounded border border-white/10 bg-white/[0.04] px-2 py-0.5 font-mono text-[11px] font-medium;
+    @apply inline-flex items-center gap-1 rounded-md border border-line bg-ink-950/50 px-2 py-0.5 font-mono text-[10px] font-medium;
+  }
+
+  .stat-cell {
+    @apply rounded-lg border border-line bg-ink-950/45 px-3 py-2.5;
+  }
+
+  .data-strip {
+    @apply flex items-center justify-between gap-3 border-y border-line py-2 font-mono text-[9px] uppercase tracking-wider text-faint;
+  }
+
+  .data-strip span:first-child {
+    @apply text-muted;
+  }
+
+  .help-copy {
+    @apply text-[11px] leading-relaxed text-faint;
+  }
+
+  .error-copy {
+    @apply rounded-lg border border-red-400/25 bg-red-400/[0.06] px-3 py-2 font-mono text-[11px] leading-relaxed text-red-200;
+  }
+
+  .progress-track {
+    @apply relative h-px overflow-hidden bg-line-strong;
+  }
+
+  .progress-sweep {
+    @apply absolute inset-y-0 w-1/3 animate-sweep bg-gradient-to-r from-transparent via-accent to-transparent;
+  }
+
+  .key-hint {
+    @apply pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-line px-1.5 py-0.5 font-mono text-[9px] text-faint;
+  }
+
+  .result-row {
+    @apply flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left text-sm outline-none transition hover:bg-ink-700/60 focus-visible:ring-1 focus-visible:ring-accent/45;
+  }
+
+  .exact-mark {
+    @apply font-mono text-[8px] uppercase tracking-wider text-accent-glow;
+  }
+
+  .comparison-card {
+    @apply rounded-xl border border-line bg-ink-950/45 p-3;
+  }
+
+  .text-link {
+    @apply font-mono uppercase tracking-wider text-accent transition hover:text-accent-glow;
+  }
+
+  .inspector-heading {
+    @apply border-b border-line px-5 py-5;
+  }
+
+  .welcome-surface {
+    @apply absolute inset-0 z-10 grid items-center gap-12 overflow-y-auto px-10 py-12;
+    grid-template-columns: minmax(0, 1fr) minmax(250px, 340px);
+  }
+
+  .welcome-copy {
+    @apply mx-auto max-w-[680px];
+  }
+
+  .welcome-copy h2 {
+    @apply mt-4 max-w-[660px] font-display text-[clamp(2.6rem,5.3vw,5.2rem)] leading-[0.98] tracking-[-0.035em] text-paper;
+  }
+
+  .welcome-copy > p {
+    @apply mt-6 max-w-[590px] text-[15px] leading-7 text-muted;
+  }
+
+  .welcome-steps {
+    @apply mt-8 grid gap-px overflow-hidden rounded-2xl border border-line bg-line md:grid-cols-3;
+  }
+
+  .welcome-steps > div {
+    @apply bg-ink-900 px-4 py-4;
+  }
+
+  .welcome-steps span {
+    @apply font-mono text-[9px] text-accent;
+  }
+
+  .welcome-steps p {
+    @apply mt-2 text-xs leading-relaxed text-muted;
+  }
+
+  .welcome-readout {
+    @apply rounded-[20px] border border-line bg-ink-950/65 p-5 shadow-panel;
+  }
+
+  .welcome-readout dl {
+    @apply mt-4 divide-y divide-line;
+  }
+
+  .welcome-readout dl > div {
+    @apply flex items-center justify-between gap-4 py-3;
+  }
+
+  .welcome-readout dt {
+    @apply text-xs text-faint;
+  }
+
+  .welcome-readout dd {
+    @apply text-right font-mono text-[10px] text-paper;
+  }
+
+  .welcome-progress {
+    @apply mt-8 inline-flex items-center gap-3 rounded-xl border border-line bg-ink-950/65 px-4 py-3;
   }
 
   .scroll-thin {
     scrollbar-width: thin;
-    scrollbar-color: rgba(155, 149, 140, 0.3) transparent;
+    scrollbar-color: rgba(113, 151, 174, 0.32) transparent;
   }
+
   .scroll-thin::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
   }
+
   .scroll-thin::-webkit-scrollbar-thumb {
-    @apply rounded-full bg-white/15;
+    @apply rounded-full bg-ink-500/70;
+  }
+}
+
+@media (max-width: 1279px) {
+  .workspace {
+    grid-template-columns: 316px minmax(0, 1fr);
+  }
+
+  .inspector-column {
+    display: none;
+  }
+
+  .mobile-inspector {
+    display: block;
+  }
+}
+
+@media (max-width: 1023px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .control-drawer {
+    @apply fixed bottom-3 left-3 top-[86px] z-40 w-[min(340px,calc(100vw-24px))] -translate-x-[calc(100%+24px)] transition-transform duration-200;
+  }
+
+  .control-drawer--open {
+    @apply translate-x-0;
+  }
+}
+
+@media (max-width: 767px) {
+  .topbar {
+    @apply mx-2 mt-2 h-[58px] rounded-2xl px-3;
+  }
+
+  .workspace {
+    @apply gap-2 p-2;
+  }
+
+  .canvas-stage {
+    @apply rounded-2xl;
+  }
+
+  .welcome-surface {
+    @apply block px-6 py-10;
+  }
+
+  .welcome-copy h2 {
+    @apply text-[2.65rem];
+  }
+
+  .welcome-readout {
+    @apply mt-7;
+  }
+
+  .canvas-legend {
+    @apply bottom-2 left-2;
+  }
+
+  .legend-panel {
+    @apply w-[min(300px,calc(100vw-32px))];
+  }
+
+  .mobile-inspector {
+    @apply bottom-2 left-2 right-2 top-auto max-h-[58vh] w-auto rounded-2xl;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

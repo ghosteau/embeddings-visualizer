@@ -1,56 +1,47 @@
-/** Left control rail: model loading, projection controls, search, comparison. */
+/** Controls for model loading, projection, search, and pairwise analysis. */
 
 import type { ReactNode } from "react";
-import { Logo } from "./Logo";
-import { ModelPicker } from "./ModelPicker";
-import { VizControls } from "./VizControls";
-import { SearchPanel } from "./SearchPanel";
 import { ComparePanel } from "./ComparePanel";
-import { useStore } from "../store/useStore";
+import { ModelPicker } from "./ModelPicker";
+import { SearchPanel } from "./SearchPanel";
+import { VizControls } from "./VizControls";
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ index, title, children }: { index: string; title: string; children: ReactNode }) {
   return (
-    <section>
-      <div className="panel-header">{title}</div>
-      <div className="px-4 pb-4">{children}</div>
+    <section className="rail-section">
+      <div className="panel-header">
+        <span>{index}</span>
+        <span>/</span>
+        <span>{title}</span>
+      </div>
+      <div className="px-4 pb-5">{children}</div>
     </section>
   );
 }
 
-export function ControlRail() {
-  const themeLabel = useStore((s) => s.themeLabel);
-  const loadedModel = useStore((s) => s.loadedModel);
-
+export function ControlRail({ onClose }: { onClose?: () => void }) {
   return (
-    <aside className="panel scroll-thin pointer-events-auto flex max-h-[calc(100vh-2rem)] w-80 flex-col divide-y divide-white/5 overflow-y-auto">
-      <div className="flex items-center gap-2.5 px-4 pb-4 pt-4">
-        <Logo size={24} className="text-paper" />
-        <div className="min-w-0 leading-tight">
-          <h1 className="font-display text-[15px] font-bold tracking-tight text-paper">
-            Embeddings Visualizer
-          </h1>
-          {loadedModel && themeLabel ? (
-            <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest2 text-faint">
-              <span className="inline-block h-2 w-2 rounded-full bg-accent" />
-              {themeLabel}
-            </p>
-          ) : (
-            <p className="font-mono text-[10px] uppercase tracking-widest2 text-faint">
-              token-space explorer
-            </p>
-          )}
+    <aside className="control-rail">
+      <div className="flex items-start justify-between gap-4 border-b border-line px-4 py-4 lg:hidden">
+        <div>
+          <div className="eyebrow">CONTROL SURFACE</div>
+          <p className="mt-1 font-display text-xl text-paper">Configure the atlas.</p>
         </div>
+        <button type="button" className="btn-ghost px-2.5 py-1.5 text-xs" onClick={onClose}>
+          Close
+        </button>
       </div>
-      <Section title="Model">
+
+      <Section index="01" title="Model source">
         <ModelPicker />
       </Section>
-      <Section title="Projection">
+      <Section index="02" title="Projection">
         <VizControls />
       </Section>
-      <Section title="Find token">
+      <Section index="03" title="Token lookup">
         <SearchPanel />
       </Section>
-      <Section title="Compare">
+      <Section index="04" title="Pairwise comparison">
         <ComparePanel />
       </Section>
     </aside>

@@ -18,6 +18,7 @@ the tests around it) stay lightweight.
 from __future__ import annotations
 
 import asyncio
+import gc
 from collections import OrderedDict
 from typing import Optional
 
@@ -203,7 +204,7 @@ class ModelManager:
         name = slot.name
         slot.progress = "Downloading tokenizer…"
         try:
-            tokenizer = AutoTokenizer.from_pretrained(name)
+            tokenizer = AutoTokenizer.from_pretrained(name, trust_remote_code=False)
         except Exception as exc:
             raise ModelLoadError(_friendly_hf_error(name, exc, "tokenizer")) from exc
 
@@ -216,7 +217,11 @@ class ModelManager:
 
         slot.progress = "Downloading model weights…"
         try:
-            model = AutoModel.from_pretrained(name)
+            model = AutoModel.from_pretrained(
+                name,
+                trust_remote_code=False,
+                low_cpu_mem_usage=True,
+            )
         except Exception as exc:
             raise ModelLoadError(_friendly_hf_error(name, exc, "model")) from exc
 
@@ -231,8 +236,11 @@ class ModelManager:
             top_n=self._settings.default_top_n,
             max_cached_projections=self._settings.max_cached_projections,
         )
-        # ``model`` and the full ``embeddings`` matrix go out of scope here; only
-        # the prepared subset inside ``loaded`` is retained.
+        # Release full weights immediately; the service only retains the
+        # compact analysed embedding subset owned by ``loaded``.
+        del embeddings
+        del model
+        gc.collect()
         return loaded
 
     def get(self, name: str) -> LoadedModel:

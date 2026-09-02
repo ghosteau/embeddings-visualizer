@@ -1,11 +1,9 @@
 /**
  * Per-model accent theming.
  *
- * Each model family gets a signature accent (loosely brand-inspired) that
- * re-themes the whole UI — buttons, sliders, the wordmark tick, the ambient
- * background glow, and the in-scene neighbor halos. Colors are chosen to stay
- * clear of the token-type palette (cyan/amber/pink/violet) so chrome and data
- * never blur together.
+ * Each family gets a restrained signature accent. The navy application shell
+ * stays consistent with the parent portfolio while controls and selected
+ * neighbors pick up the active model's identity.
  */
 
 export interface ModelTheme {
@@ -28,13 +26,13 @@ const THEMES: Record<string, ModelTheme> = {
     glowHex: "#93c5fd",
     label: "OpenAI / GPT",
   },
-  // Google blue for the BERT family.
+  // Warm gold differentiates bidirectional BERT models from GPT models.
   bert: {
-    accent: "66 133 244",
-    accentSoft: "104 161 247",
-    accentGlow: "150 193 252",
-    glowHex: "#96c1fc",
-    label: "Google / BERT",
+    accent: "209 162 76",
+    accentSoft: "229 188 105",
+    accentGlow: "240 210 151",
+    glowHex: "#f0d297",
+    label: "BERT family",
   },
   // Meta-leaning violet for RoBERTa.
   roberta: {
@@ -44,13 +42,13 @@ const THEMES: Record<string, ModelTheme> = {
     glowHex: "#b5a5ff",
     label: "Meta / RoBERTa",
   },
-  // Signature terracotta fallback for everything else (incl. custom models).
+  // Portfolio cyan is the neutral/default identity for custom architectures.
   default: {
-    accent: "216 98 58",
-    accentSoft: "232 127 90",
-    accentGlow: "240 161 132",
-    glowHex: "#f0a184",
-    label: "Custom",
+    accent: "82 198 229",
+    accentSoft: "121 216 239",
+    accentGlow: "154 229 246",
+    glowHex: "#9ae5f6",
+    label: "Custom model",
   },
 };
 

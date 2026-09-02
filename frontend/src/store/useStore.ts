@@ -102,6 +102,15 @@ const DEFAULT_CONFIG: VisualizationConfig = {
 
 let toastSeq = 0;
 let focusSeq = 0;
+let searchSeq = 0;
+let detailSeq = 0;
+
+function preferredPointCount(total: number): number {
+  if (typeof window === "undefined") return Math.min(2500, total);
+  const compact = window.matchMedia("(max-width: 767px)").matches;
+  const lowConcurrency = (navigator.hardwareConcurrency ?? 8) <= 4;
+  return Math.min(compact || lowConcurrency ? 1400 : 2800, total);
+}
 
 export const useStore = create<AppState>((set, get) => ({
   models: null,
@@ -120,7 +129,7 @@ export const useStore = create<AppState>((set, get) => ({
   neighborIndices: [],
   neighborMetric: "cosine",
   focus: null,
-  accentGlowHex: "#f0a184",
+  accentGlowHex: "#9ae5f6",
   themeLabel: null,
   searchQuery: "",
   searchResults: [],
@@ -141,7 +150,8 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  setSelectedModel: (id) => set({ selectedModelId: id }),
+  setSelectedModel: (id) =>
+    set({ selectedModelId: id, searchQuery: "", searchResults: [], comparisonError: null }),
 
   setConfig: (patch) => set({ config: { ...get().config, ...patch } }),
 
@@ -156,7 +166,7 @@ export const useStore = create<AppState>((set, get) => ({
     // Poll the status endpoint for live progress while /load runs server-side.
     // The load happens in a worker thread, so the event loop keeps serving
     // /status requests and we can surface the backend's stage messages.
-    const poll = setInterval(async () => {
+    const poll = window.setInterval(async () => {
       try {
         const status = await api.modelStatus(model);
         if (status.progress && get().loadState === "loading") {
@@ -169,7 +179,6 @@ export const useStore = create<AppState>((set, get) => ({
 
     try {
       await api.loadModel(model);
-      clearInterval(poll);
       // Re-theme the UI/scene accent based on the model family (a bit of fun).
       const family = get().models?.presets.find((p) => p.id === model)?.family;
       const theme = themeForModel(model, family);
@@ -190,10 +199,11 @@ export const useStore = create<AppState>((set, get) => ({
       set({ loadState: "ready" });
       get().pushToast("success", `${model} loaded — ${get().vizData?.tokens.length ?? 0} tokens projected.`);
     } catch (e) {
-      clearInterval(poll);
       const msg = e instanceof ApiError ? e.message : "Failed to load model";
       set({ loadState: "error", loadProgress: msg });
       get().pushToast("error", msg);
+    } finally {
+      window.clearInterval(poll);
     }
   },
 
@@ -209,7 +219,7 @@ export const useStore = create<AppState>((set, get) => ({
         positions: normalizeCoordinates(vizData.coordinates),
         // Render a lighter subset by default for smoothness; every token stays
         // searchable/inspectable, and the "Visible points" slider goes to max.
-        displayCount: Math.min(3000, vizData.tokens.length),
+        displayCount: preferredPointCount(vizData.tokens.length),
         selectedIndex: null,
         tokenDetail: null,
         neighborIndices: [],
@@ -226,15 +236,18 @@ export const useStore = create<AppState>((set, get) => ({
   selectToken: async (index) => {
     const model = get().loadedModel;
     if (!model) return;
+    const requestId = ++detailSeq;
     set({ selectedIndex: index, detailLoading: true });
     try {
       const detail = await api.tokenFull(model, index, 20, get().neighborMetric);
+      if (requestId !== detailSeq || get().loadedModel !== model) return;
       set({
         tokenDetail: detail,
         neighborIndices: detail.neighbors.map((n) => n.index),
         detailLoading: false,
       });
     } catch (e) {
+      if (requestId !== detailSeq) return;
       set({ detailLoading: false });
       get().pushToast("error", e instanceof Error ? e.message : "Failed to load token");
     }
@@ -247,9 +260,21 @@ export const useStore = create<AppState>((set, get) => ({
     await get().selectToken(index);
   },
 
-  setHovered: (index) => set({ hoveredIndex: index }),
+  setHovered: (index) => {
+    if (get().hoveredIndex !== index) set({ hoveredIndex: index });
+  },
 
-  clearSelection: () => set({ selectedIndex: null, tokenDetail: null, neighborIndices: [] }),
+  clearSelection: () => {
+    // Invalidate an in-flight detail request so it cannot reopen the inspector
+    // after the user explicitly cleared it.
+    detailSeq += 1;
+    set({
+      selectedIndex: null,
+      tokenDetail: null,
+      neighborIndices: [],
+      detailLoading: false,
+    });
+  },
 
   setNeighborMetric: async (m) => {
     set({ neighborMetric: m });
@@ -258,6 +283,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   runSearch: async (query) => {
+    const requestId = ++searchSeq;
     set({ searchQuery: query });
     const model = get().loadedModel;
     if (!model || query.trim().length === 0) {
@@ -266,9 +292,9 @@ export const useStore = create<AppState>((set, get) => ({
     }
     try {
       const searchResults = await api.search(model, query.trim(), 30);
-      set({ searchResults });
+      if (requestId === searchSeq && get().loadedModel === model) set({ searchResults });
     } catch {
-      set({ searchResults: [] });
+      if (requestId === searchSeq) set({ searchResults: [] });
     }
   },
 

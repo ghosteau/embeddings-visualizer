@@ -46,8 +46,7 @@ export function Slider({
       step={step}
       disabled={disabled}
       onChange={(e) => onChange(Number(e.target.value))}
-      className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/10
-                 accent-accent disabled:cursor-not-allowed disabled:opacity-40"
+      className="range-input disabled:cursor-not-allowed disabled:opacity-40"
     />
   );
 }
@@ -62,15 +61,15 @@ export function SegToggle<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="flex rounded-lg border border-white/10 bg-ink-900/60 p-0.5">
+    <div className="segmented-control">
       {options.map((o) => (
         <button
+          type="button"
           key={o.value}
+          aria-pressed={value === o.value}
           onClick={() => onChange(o.value)}
           className={`flex-1 rounded px-2 py-1 text-xs font-medium transition ${
-            value === o.value
-              ? "bg-accent font-semibold text-accent-ink"
-              : "text-muted hover:text-paper"
+            value === o.value ? "segmented-control--active" : "text-muted hover:text-paper"
           }`}
         >
           {o.label}
@@ -82,7 +81,7 @@ export function SegToggle<T extends string>({
 
 export function Stat({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="rounded-lg border border-white/5 bg-white/5 px-3 py-2">
+    <div className="stat-cell">
       <div className="font-mono text-[10px] uppercase tracking-wider text-faint">{label}</div>
       <div className="font-mono text-sm text-paper">{value}</div>
     </div>

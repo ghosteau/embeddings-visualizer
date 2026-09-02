@@ -9,13 +9,14 @@
  * highlighted even when it sits outside the visible-points cutoff.
  */
 
-import { useMemo } from "react";
-import { AdditiveBlending, CanvasTexture, Color } from "three";
+import { useLayoutEffect, useMemo, useRef } from "react";
+import { AdditiveBlending, CanvasTexture, Color, InstancedMesh, Object3D } from "three";
 import { Html } from "@react-three/drei";
 import { useStore } from "../../store/useStore";
 import { pointAt } from "../../lib/layout";
-import { TOKEN_THREE_COLORS } from "../../lib/tokenColors";
-import type { VisualizationData } from "../../lib/types";
+import { formatToken } from "../../lib/tokenFormat";
+import { TOKEN_COLORS } from "../../lib/tokenColors";
+import type { TokenType, VisualizationData } from "../../lib/types";
 
 /** Build a soft radial sprite so points render as glowing discs, not squares. */
 function useSpriteTexture(): CanvasTexture {
@@ -34,7 +35,35 @@ function useSpriteTexture(): CanvasTexture {
   }, []);
 }
 
-const DIM = new Color("#0b0b0d");
+const DIM = new Color("#07121f");
+const TOKEN_THREE_COLORS = Object.fromEntries(
+  Object.entries(TOKEN_COLORS).map(([key, value]) => [key, new Color(value)]),
+) as Record<TokenType, Color>;
+
+function NeighborMarkers({ indices, positions, color }: { indices: number[]; positions: Float32Array; color: string }) {
+  const mesh = useRef<InstancedMesh>(null);
+  const object = useMemo(() => new Object3D(), []);
+
+  useLayoutEffect(() => {
+    if (!mesh.current) return;
+    indices.forEach((index, instance) => {
+      const [x, y, z] = pointAt(positions, index);
+      object.position.set(x, y, z);
+      object.updateMatrix();
+      mesh.current?.setMatrixAt(instance, object.matrix);
+    });
+    mesh.current.instanceMatrix.needsUpdate = true;
+  }, [indices, object, positions]);
+
+  if (indices.length === 0) return null;
+
+  return (
+    <instancedMesh ref={mesh} args={[undefined, undefined, indices.length]}>
+      <sphereGeometry args={[0.24, 8, 8]} />
+      <meshBasicMaterial color={color} transparent opacity={0.58} />
+    </instancedMesh>
+  );
+}
 
 export function PointCloud({ data }: { data: VisualizationData }) {
   const sprite = useSpriteTexture();
@@ -50,10 +79,10 @@ export function PointCloud({ data }: { data: VisualizationData }) {
 
   const count = Math.min(displayCount || data.tokens.length, data.tokens.length);
 
-  // Visible slice of positions (the base cloud). Sliced rather than reusing the
-  // full buffer so raycasting only hits points the user can actually see.
+  // A zero-copy view keeps density changes cheap while ensuring raycasting only
+  // sees points that are actually rendered.
   const visiblePositions = useMemo(
-    () => (positions ? positions.slice(0, count * 3) : new Float32Array(0)),
+    () => (positions ? positions.subarray(0, count * 3) : new Float32Array(0)),
     [positions, count],
   );
 
@@ -110,13 +139,8 @@ export function PointCloud({ data }: { data: VisualizationData }) {
         />
       </points>
 
-      {/* Neighbor halos: warm accent discs, drawn from the full position set. */}
-      {neighborIndices.map((i) => (
-        <mesh key={`nb-${i}`} position={posOf(i)}>
-          <sphereGeometry args={[0.24, 10, 10]} />
-          <meshBasicMaterial color={accentGlowHex} transparent opacity={0.55} />
-        </mesh>
-      ))}
+      {/* All neighbor halos share one instanced draw call. */}
+      <NeighborMarkers indices={neighborIndices} positions={positions} color={accentGlowHex} />
 
       {/* Selected token: bright marker + persistent label. */}
       {selectedIndex != null && (
@@ -143,11 +167,4 @@ export function PointCloud({ data }: { data: VisualizationData }) {
       )}
     </group>
   );
-}
-
-/** Make whitespace/empty tokens legible in labels. */
-function formatToken(token: string): string {
-  if (token === " ") return "␣ (space)";
-  if (token.trim() === "") return JSON.stringify(token);
-  return token;
 }

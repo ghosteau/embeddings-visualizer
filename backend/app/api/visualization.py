@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import get_manager
@@ -31,7 +33,9 @@ async def create_visualization(
     """
     loaded = manager.get(model)  # raises 409 if not loaded
 
-    projection = loaded.reduce_dimensions(config)
+    # UMAP is CPU-bound and may run for tens of seconds. Keep it off the ASGI
+    # event loop so health/status/token requests remain responsive meanwhile.
+    projection = await asyncio.to_thread(loaded.reduce_dimensions, config)
 
     statistics = VisualizationStatistics(
         total_tokens=loaded.token_count,

@@ -31,6 +31,33 @@ def test_classify_token(token: str, expected: TokenType) -> None:
     assert _classify_token(token) == expected
 
 
+def test_preserves_significant_whitespace_and_resolves_surface_names(
+    embeddings: np.ndarray,
+) -> None:
+    """BPE leading spaces remain visible data while plain-text lookup works."""
+
+    class WhitespaceTokenizer:
+        values = [" the", " cat", "dog"]
+
+        def decode(self, ids: list[int]) -> str:
+            return self.values[ids[0]]
+
+    model = LoadedModel(
+        name="whitespace-model",
+        embeddings=embeddings[:3],
+        tokenizer=WhitespaceTokenizer(),
+        top_n=3,
+    )
+
+    assert model.tokens[:2] == [" the", " cat"]
+    assert model.compare_by_name("the", "cat")["token1_index"] == 0
+    assert model.search_tokens("the")[0] == {
+        "token": " the",
+        "index": 0,
+        "match_type": "exact",
+    }
+
+
 def test_neighbors_exclude_self_and_are_sorted(loaded_model: LoadedModel) -> None:
     neighbors = loaded_model.find_neighbors(0, n_neighbors=5, metric=DistanceMetric.euclidean)
     assert len(neighbors) == 5

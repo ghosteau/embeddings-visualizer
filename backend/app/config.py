@@ -8,6 +8,7 @@ See ``.env.example`` for the full list of knobs and their defaults.
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -38,6 +39,14 @@ class Settings(BaseSettings):
     # --------------------------------------------------------------- Network --
     host: str = "0.0.0.0"
     port: int = 8000
+
+    # When set, FastAPI serves the compiled Vite application from this folder.
+    # The production container uses this for a same-origin, single-service deploy.
+    static_dir: Path | None = None
+
+    # Projection responses are highly compressible JSON. GZip materially cuts
+    # transfer size when the API and frontend are on different hosts.
+    gzip_minimum_size: int = Field(default=1000, ge=0, le=1_000_000)
 
     # CORS: comma-separated list of allowed origins. Defaults to the common
     # Vite dev-server origins. In production set this to your real frontend URL.
@@ -87,6 +96,14 @@ class Settings(BaseSettings):
         """
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+    @field_validator("static_dir", mode="before")
+    @classmethod
+    def _empty_static_dir_is_none(cls, value: object) -> object:
+        """Treat a blank environment value as disabled, never as ``Path('.')``."""
+        if isinstance(value, str) and not value.strip():
+            return None
         return value
 
     @property

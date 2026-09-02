@@ -17,9 +17,20 @@ export function VizControls() {
   const busy = loadState === "visualizing" || loadState === "loading";
   const disabled = !loadedModel || busy;
   const totalPoints = vizData?.tokens.length ?? 0;
+  const dirty = Boolean(
+    vizData &&
+      (vizData.config.n_components !== config.n_components ||
+        vizData.config.metric !== config.metric ||
+        vizData.config.n_neighbors !== config.n_neighbors ||
+        vizData.config.min_dist !== config.min_dist),
+  );
 
   return (
     <div className="space-y-4">
+      <div className="data-strip">
+        <span>UMAP</span>
+        <span>{dirty ? "changes pending" : vizData ? "projection current" : "not computed"}</span>
+      </div>
       <Field label="Dimensions">
         <SegToggle
           value={String(config.n_components)}
@@ -62,8 +73,12 @@ export function VizControls() {
         />
       </Field>
 
-      <button className="btn-ghost w-full" disabled={disabled} onClick={() => regenerate()}>
-        {loadState === "visualizing" ? "Re-projecting…" : "Re-project"}
+      <button
+        className="btn-ghost w-full"
+        disabled={disabled}
+        onClick={() => void regenerate().catch(() => undefined)}
+      >
+        {loadState === "visualizing" ? "Computing…" : dirty ? "Apply projection" : "Recompute"}
       </button>
 
       {/* Visible-points is a purely client-side declutter — no re-projection.
@@ -83,6 +98,11 @@ export function VizControls() {
           />
         </Field>
       )}
+
+      <p className="help-copy">
+        Projection controls change the spatial layout. Visible points only changes rendering and
+        keeps every analysed token searchable.
+      </p>
     </div>
   );
 }

@@ -6,6 +6,7 @@
  */
 
 import { useState } from "react";
+import { formatToken } from "../lib/tokenFormat";
 import { useStore } from "../store/useStore";
 
 export function ComparePanel() {
@@ -43,13 +44,13 @@ export function ComparePanel() {
         />
       </div>
       <button className="btn-ghost w-full" disabled={!loadedModel || !a || !b} onClick={submit}>
-        Compare
+        Run comparison
       </button>
 
-      {comparisonError && <p className="font-mono text-xs text-accent-glow">{comparisonError}</p>}
+      {comparisonError && <p className="error-copy">{comparisonError}</p>}
 
       {comparison && (
-        <div className="animate-fade-in space-y-3 rounded-md border border-white/10 bg-white/[0.03] p-3">
+        <div className="comparison-card animate-fade-in space-y-3">
           {/* Clickable tokens → inspect in the scene. */}
           <div className="flex items-center justify-between gap-2">
             <button
@@ -57,7 +58,7 @@ export function ComparePanel() {
               className="chip max-w-[45%] truncate hover:border-accent/50 hover:text-accent-glow"
               title="Inspect this token"
             >
-              {comparison.token1}
+              {formatToken(comparison.token1)}
             </button>
             <span className="font-mono text-[10px] text-faint">vs</span>
             <button
@@ -65,7 +66,7 @@ export function ComparePanel() {
               className="chip max-w-[45%] truncate hover:border-accent/50 hover:text-accent-glow"
               title="Inspect this token"
             >
-              {comparison.token2}
+              {formatToken(comparison.token2)}
             </button>
           </div>
 
@@ -76,7 +77,7 @@ export function ComparePanel() {
                 {comparison.cosine_similarity.toFixed(4)}
               </span>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div className="h-1 overflow-hidden rounded-full bg-white/10">
               <div className="h-full rounded-full bg-accent" style={{ width: `${fill * 100}%` }} />
             </div>
           </div>
@@ -86,6 +87,12 @@ export function ComparePanel() {
             <span className="font-mono text-paper">{comparison.euclidean_distance.toFixed(3)}</span>
           </div>
         </div>
+      )}
+
+      {!comparison && !comparisonError && (
+        <p className="help-copy">
+          Values are calculated from the original embedding vectors, not from the UMAP projection.
+        </p>
       )}
     </div>
   );

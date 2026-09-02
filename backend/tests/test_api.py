@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 from fastapi.testclient import TestClient
 
@@ -10,13 +12,40 @@ from tests.conftest import VOCAB
 MODEL = "fake-model"
 
 
-def test_root_and_health(client: TestClient) -> None:
-    assert client.get("/").status_code == 200
+def test_metadata_and_health(client: TestClient) -> None:
+    metadata = client.get("/api")
+    assert metadata.status_code == 200
+    assert metadata.json()["docs"] == "/docs"
     health = client.get("/health")
     assert health.status_code == 200
     body = health.json()
     assert body["status"] == "healthy"
     assert any(m["model"] == MODEL for m in body["cached_models"])
+    assert health.headers["x-request-id"]
+    assert float(health.headers["x-process-time-ms"]) >= 0
+    assert health.headers["x-content-type-options"] == "nosniff"
+
+
+def test_compiled_frontend_owns_root(settings) -> None:
+    """A same-origin production build must serve HTML at the public root."""
+    from app.main import create_app
+
+    static_dir = Path(__file__).parent / "static"
+    production = settings.model_copy(
+        update={"environment": "production", "static_dir": static_dir}
+    )
+
+    with TestClient(create_app(production)) as production_client:
+        response = production_client.get("/")
+        assert response.status_code == 200
+        assert "embeddings visualizer" in response.text
+        assert production_client.get("/api").json()["docs"] is None
+
+
+def test_blank_static_directory_is_disabled() -> None:
+    from app.config import Settings
+
+    assert Settings(static_dir="").static_dir is None
 
 
 def test_list_models(client: TestClient) -> None:
@@ -118,3 +147,9 @@ def test_visualization_endpoint(client: TestClient, monkeypatch) -> None:
 def test_validation_error_on_bad_metric(client: TestClient) -> None:
     resp = client.get("/api/tokens/0", params={"model": MODEL, "metric": "manhattan"})
     assert resp.status_code == 422
+
+
+def test_model_load_rejects_urls_and_filesystem_paths(client: TestClient) -> None:
+    for model in ("https://example.com/model", "../private-model", r"C:\\models\\local"):
+        response = client.post("/api/models/load", json={"model": model})
+        assert response.status_code == 422

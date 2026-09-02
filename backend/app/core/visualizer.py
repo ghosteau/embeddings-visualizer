@@ -32,11 +32,12 @@ _SPECIAL_CHAR_RE = re.compile(r"[^a-zA-Z0-9\s]")
 
 def _classify_token(token: str) -> TokenType:
     """Assign a coarse lexical category to a decoded token string."""
-    if token.startswith("<") and token.endswith(">"):
+    surface = token.strip()
+    if surface.startswith("<") and surface.endswith(">"):
         return TokenType.special
-    if token.isdigit():
+    if surface.isdigit():
         return TokenType.number
-    if token.isalpha():
+    if surface.isalpha():
         return TokenType.word
     return TokenType.mixed
 
@@ -100,6 +101,11 @@ class LoadedModel:
         self._norms = np.linalg.norm(self.selected_embeddings, axis=1)
         # Guard against division-by-zero for any all-zero embedding rows.
         self._safe_norms = np.where(self._norms == 0, 1e-12, self._norms)
+        # Keep one normalized copy so repeated cosine queries are a single
+        # matrix-vector product instead of normalizing 6k vectors every time.
+        self._normalized_embeddings = np.ascontiguousarray(
+            self.selected_embeddings / self._safe_norms[:, None], dtype=np.float32
+        )
 
         self.tokens: list[str] = []
         self.token_types: list[TokenType] = []
@@ -108,10 +114,35 @@ class LoadedModel:
         self.is_upper: list[bool] = []
         self.is_digit: list[bool] = []
 
-        for idx in self.selected_indices:
+        decoded_tokens: Optional[list[str]] = None
+        batch_decode = getattr(tokenizer, "batch_decode", None)
+        if callable(batch_decode):
+            token_ids = [[idx] for idx in self.selected_indices]
             try:
-                decoded = tokenizer.decode([idx]) if tokenizer is not None else ""
-                token = decoded.strip() or f"<TOKEN_{idx}>"
+                decoded_tokens = list(
+                    batch_decode(
+                        token_ids,
+                        clean_up_tokenization_spaces=False,
+                        skip_special_tokens=False,
+                    )
+                )
+            except (TypeError, ValueError):
+                # Lightweight/mock tokenizers may expose a narrower signature.
+                try:
+                    decoded_tokens = list(batch_decode(token_ids))
+                except Exception:
+                    decoded_tokens = None
+
+        for position, idx in enumerate(self.selected_indices):
+            try:
+                decoded = (
+                    decoded_tokens[position]
+                    if decoded_tokens is not None
+                    else tokenizer.decode([idx]) if tokenizer is not None else ""
+                )
+                # Leading whitespace is meaningful for BPE tokenizers. Preserve
+                # it exactly; the frontend renders it with a visible marker.
+                token = decoded if decoded != "" else f"<TOKEN_{idx}>"
             except Exception:
                 # A handful of vocabulary ids decode to invalid byte sequences;
                 # represent them with a stable placeholder rather than failing.
@@ -120,11 +151,17 @@ class LoadedModel:
             self.tokens.append(token)
             self.token_types.append(_classify_token(token))
             self.lengths.append(len(token))
-            self.has_special.append(bool(_SPECIAL_CHAR_RE.search(token)))
-            self.is_upper.append(token.isupper())
-            self.is_digit.append(token.isdigit())
+            surface = token.strip()
+            self.has_special.append(bool(_SPECIAL_CHAR_RE.search(surface)))
+            self.is_upper.append(surface.isupper())
+            self.is_digit.append(surface.isdigit())
 
         self.token_count = len(self.tokens)
+        self._exact_tokens: dict[str, int] = {}
+        self._normalized_tokens: dict[str, int] = {}
+        for index, token in enumerate(self.tokens):
+            self._exact_tokens.setdefault(token, index)
+            self._normalized_tokens.setdefault(token.strip().casefold(), index)
 
     @property
     def embedding_norms(self) -> np.ndarray:
@@ -146,8 +183,7 @@ class LoadedModel:
         which is dramatically faster than the original per-token Python loop.
         """
         target_norm = float(np.linalg.norm(target)) or 1e-12
-        dots = self.selected_embeddings @ target
-        return dots / (self._safe_norms * target_norm)
+        return self._normalized_embeddings @ (target / target_norm)
 
     # ----------------------------------------------------------- projections --
     def reduce_dimensions(self, config) -> np.ndarray:
@@ -168,24 +204,26 @@ class LoadedModel:
         with self._projection_lock:
             cached = self._projections.get(key)
             if cached is not None:
-                self._projections.move_to_end(key)  # mark most-recently-used
+                self._projections.move_to_end(key)
                 self._active_projection = cached
                 return cached
 
-        # Compute outside the lock: UMAP can take seconds and we must not block
-        # other models' projection lookups while it runs.
-        import umap  # local import: heavy, optional at import time
+            # Projection requests for one model are intentionally serialized.
+            # This prevents two clients from running the same expensive UMAP
+            # fit concurrently while still allowing different models to work
+            # in parallel on their own worker threads.
+            import umap  # local import: heavy, optional at import time
 
-        reducer = umap.UMAP(
-            n_neighbors=min(config.n_neighbors, max(2, self.token_count - 1)),
-            min_dist=config.min_dist,
-            metric=config.metric.value,
-            n_components=config.n_components,
-            random_state=42,  # deterministic projections for reproducibility
-        )
-        projection = reducer.fit_transform(self.selected_embeddings).astype(np.float32)
+            reducer = umap.UMAP(
+                n_neighbors=min(config.n_neighbors, max(2, self.token_count - 1)),
+                min_dist=config.min_dist,
+                metric=config.metric.value,
+                n_components=config.n_components,
+                random_state=42,
+                low_memory=True,
+            )
+            projection = reducer.fit_transform(self.selected_embeddings).astype(np.float32)
 
-        with self._projection_lock:
             self._projections[key] = projection
             self._projections.move_to_end(key)
             # Evict least-recently-used projections beyond the cap.
@@ -255,11 +293,17 @@ class LoadedModel:
         if metric == DistanceMetric.cosine:
             distances = 1.0 - similarities
         else:  # euclidean
-            distances = np.linalg.norm(self.selected_embeddings - target, axis=1)
+            target_norm_sq = float(np.dot(target, target))
+            distances = np.sqrt(
+                np.maximum(self._norms**2 + target_norm_sq - 2.0 * (self.selected_embeddings @ target), 0.0)
+            )
 
-        # argsort ascending; drop self (always distance 0 to itself).
-        order = np.argsort(distances)
-        order = order[order != index][:n_neighbors]
+        # Partial selection avoids sorting the entire vocabulary for a small
+        # nearest-neighbor result, then sorts only the chosen candidates.
+        candidate_count = min(n_neighbors + 1, self.token_count)
+        order = np.argpartition(distances, candidate_count - 1)[:candidate_count]
+        order = order[order != index]
+        order = order[np.argsort(distances[order])][:n_neighbors]
 
         return [
             {
@@ -277,27 +321,28 @@ class LoadedModel:
         Exact matches are surfaced first, then substring matches, so the most
         relevant results appear at the top of the list.
         """
-        q = query.lower()
+        q = query.casefold().strip()
+        if not q:
+            return []
         exact: list[dict[str, Any]] = []
         contains: list[dict[str, Any]] = []
 
         for i, token in enumerate(self.tokens):
-            lowered = token.lower()
-            if lowered == q:
+            raw = token.casefold()
+            surface = token.strip().casefold()
+            if raw == q or surface == q:
                 exact.append({"token": token, "index": i, "match_type": "exact"})
-            elif q in lowered:
+            elif q in raw or q in surface:
                 contains.append({"token": token, "index": i, "match_type": "contains"})
-            if len(exact) + len(contains) >= max_results * 2:
-                break
 
         return (exact + contains)[:max_results]
 
     def _resolve_token(self, name: str) -> Optional[int]:
         """Return the index of the first token exactly equal to ``name``."""
-        try:
-            return self.tokens.index(name)
-        except ValueError:
-            return None
+        exact = self._exact_tokens.get(name)
+        if exact is not None:
+            return exact
+        return self._normalized_tokens.get(name.strip().casefold())
 
     def compare_by_index(self, index1: int, index2: int) -> dict[str, Any]:
         """Compare two tokens (by index) on raw embeddings."""
@@ -354,10 +399,7 @@ class LoadedModel:
             raise ValueError("Need at least two resolvable tokens to compare.")
 
         idxs = [idx for _, idx in resolved]
-        vectors = self.selected_embeddings[idxs]
-        norms = np.linalg.norm(vectors, axis=1)
-        norms = np.where(norms == 0, 1e-12, norms)
-        normalized = vectors / norms[:, None]
+        normalized = self._normalized_embeddings[idxs]
         matrix = normalized @ normalized.T
 
         return {

@@ -9,10 +9,14 @@ avoids global side effects on import.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from time import perf_counter
+from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api import analysis, health, models, tokens, visualization
 from app.config import Settings, get_settings
@@ -20,20 +24,18 @@ from app.core.exceptions import VisualizerError
 from app.core.model_manager import ModelManager
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Manage process-wide resources for the app's lifetime.
+def build_lifespan(settings: Settings):
+    """Bind one validated settings object to the application's lifetime."""
 
-    On startup we construct the single :class:`ModelManager` and attach it to
-    ``app.state``. On shutdown we drop the reference so cached models (and their
-    embedding matrices) are released promptly.
-    """
-    settings: Settings = get_settings()
-    app.state.manager = ModelManager(settings)
-    try:
-        yield
-    finally:
-        app.state.manager = None
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        app.state.manager = ModelManager(settings)
+        try:
+            yield
+        finally:
+            app.state.manager = None
+
+    return lifespan
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -63,7 +65,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "load a model, project its embeddings to 2D/3D with UMAP, and inspect "
             "neighbors, similarities, and statistics."
         ),
-        lifespan=lifespan,
+        lifespan=build_lifespan(settings),
         # Hide interactive docs in production unless explicitly desired.
         docs_url="/docs" if not settings.is_production else None,
         redoc_url="/redoc" if not settings.is_production else None,
@@ -72,10 +74,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Accept"],
     )
+    app.add_middleware(GZipMiddleware, minimum_size=settings.gzip_minimum_size)
+
+    @app.middleware("http")
+    async def add_operational_headers(request: Request, call_next):
+        """Add trace and timing headers without exposing framework details."""
+        request_id = uuid4().hex
+        started = perf_counter()
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        response.headers["X-Process-Time-Ms"] = f"{(perf_counter() - started) * 1000:.1f}"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        return response
 
     register_exception_handlers(app)
 
@@ -85,6 +100,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(visualization.router)
     app.include_router(tokens.router)
     app.include_router(analysis.router)
+
+    # A production build can be served by this process after every API route.
+    # Keeping API registration first ensures the SPA mount never shadows it.
+    if settings.static_dir and settings.static_dir.is_dir():
+        app.mount("/", StaticFiles(directory=settings.static_dir, html=True), name="frontend")
+
+    # Route dependencies receive the exact same settings instance as lifespan
+    # and middleware, including in tests that call create_app(custom_settings).
+    app.dependency_overrides[get_settings] = lambda: settings
 
     return app
 

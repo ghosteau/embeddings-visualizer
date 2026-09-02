@@ -14,13 +14,13 @@ from app.schemas import HealthResponse, ModelStatus
 router = APIRouter(tags=["health"])
 
 
-@router.get("/", summary="Service metadata")
+@router.get("/api", summary="Service metadata")
 async def root(settings: Settings = Depends(get_settings)) -> dict:
     """Return basic identifying information about the running service."""
     return {
         "service": settings.app_name,
         "version": settings.app_version,
-        "docs": "/docs",
+        "docs": None if settings.is_production else "/docs",
         "health": "/health",
     }
 

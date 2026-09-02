@@ -3,9 +3,9 @@
 import { useStore } from "../store/useStore";
 
 const STYLES = {
-  info: "border-white/15 bg-ink-700/90",
-  success: "border-emerald-400/30 bg-emerald-500/15 text-emerald-100",
-  error: "border-rose-400/30 bg-rose-500/15 text-rose-100",
+  info: "border-line-strong bg-ink-800 text-paper",
+  success: "border-cyan-400/35 bg-ink-800 text-paper",
+  error: "border-red-400/40 bg-ink-800 text-paper",
 } as const;
 
 export function Toasts() {
@@ -18,7 +18,7 @@ export function Toasts() {
         <div
           key={t.id}
           onClick={() => dismiss(t.id)}
-          className={`pointer-events-auto animate-fade-in cursor-pointer rounded-xl border px-4 py-3 text-sm shadow-panel backdrop-blur-xl ${STYLES[t.type]}`}
+          className={`pointer-events-auto animate-fade-in cursor-pointer rounded-xl border px-4 py-3 text-sm shadow-panel ${STYLES[t.type]}`}
         >
           {t.message}
         </div>

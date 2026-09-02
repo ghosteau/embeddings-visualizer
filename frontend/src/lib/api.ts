@@ -22,9 +22,11 @@ import type {
   VisualizationData,
 } from "./types";
 
-const BASE_URL =
-  (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ||
-  "http://localhost:8000";
+const configuredBaseUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "");
+
+// Development uses the standalone FastAPI port. Production defaults to the
+// current origin so one container/reverse proxy can serve both UI and API.
+const BASE_URL = configuredBaseUrl || (import.meta.env.DEV ? "http://localhost:8000" : "");
 
 /** Error carrying the HTTP status and the backend's human-readable detail. */
 export class ApiError extends Error {
@@ -42,13 +44,19 @@ export class ApiError extends Error {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
+    const headers = new Headers(init?.headers);
+    headers.set("Accept", "application/json");
+    // A content type on bodyless GETs triggers unnecessary CORS preflights in
+    // split deployments. Only declare JSON when a body is actually present.
+    if (init?.body != null) headers.set("Content-Type", "application/json");
     res = await fetch(`${BASE_URL}${path}`, {
-      headers: { "Content-Type": "application/json" },
       ...init,
+      headers,
     });
   } catch {
     // Network-level failure (server down, CORS, offline).
-    throw new ApiError(0, `Cannot reach the API at ${BASE_URL}. Is the backend running?`);
+    const endpoint = BASE_URL || "the current origin";
+    throw new ApiError(0, `Cannot reach the API at ${endpoint}. Is the backend running?`);
   }
 
   if (!res.ok) {
