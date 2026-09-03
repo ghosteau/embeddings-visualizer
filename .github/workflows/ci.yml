@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [master, dev]
+  pull_request:
+    branches: [master, dev]
+
+# A new push to a branch makes an in-flight run for that branch obsolete.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Matches the runtime stage of the production Dockerfile.
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install torch (CPU build)
+        # Default PyPI resolves torch to the CUDA build: ~2.5 GB of NVIDIA
+        # wheels a CI runner can never use. Installing from the CPU index first
+        # means the requirements step below finds it already satisfied.
+        run: pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.2,<3.0"
+
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        # pyproject.toml sets testpaths relative to this directory, and the
+        # suite imports "app" as a top-level package, so cwd matters.
+        working-directory: backend
+        run: pytest
+
+  frontend:
+    name: Frontend (lint, types, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches the build stage of the production Dockerfile.
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Type-check and build
+        # "build" is `tsc -b && vite build`, so this covers type errors and
+        # verifies the bundle the production image actually ships.
+        working-directory: frontend
+        run: npm run build
