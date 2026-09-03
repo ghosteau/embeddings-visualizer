@@ -1,4 +1,4 @@
-/** Debounced token lookup across the complete analysed vocabulary subset. */
+﻿/** Debounced token lookup across the complete analyzed vocabulary subset. */
 
 import { useEffect, useState } from "react";
 import { formatToken } from "../lib/tokenFormat";
@@ -60,7 +60,7 @@ export function SearchPanel() {
       )}
 
       {loadedModel && query.trim() && searchResults.length === 0 && (
-        <p className="help-copy px-1">No analysed token matches this text.</p>
+        <p className="help-copy px-1">No analyzed token matches this text.</p>
       )}
       {!loadedModel && <p className="help-copy">Load a model to query its token vocabulary.</p>}
     </div>
