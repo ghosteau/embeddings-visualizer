@@ -1,0 +1,50 @@
+# nginx equivalent of Caddyfile.example, for hosts already running nginx.
+#
+# Install as /etc/nginx/sites-available/embeddings, then:
+#   ln -s /etc/nginx/sites-available/embeddings /etc/nginx/sites-enabled/
+#   nginx -t && systemctl reload nginx
+#   certbot --nginx -d embeddings.mannymcgrail.com
+#
+# certbot rewrites this file in place to add the TLS listener and to redirect
+# port 80, so apply it as plain HTTP first and let certbot do the rest. Point
+# the DNS A record at this server before running certbot: the HTTP-01
+# challenge has to reach port 80. Behind Cloudflare, leave the record
+# unproxied ("DNS only") until the certificate is issued.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name embeddings.mannymcgrail.com;
+
+    # The container publishes on loopback only, so nginx is the sole way in.
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        # uvicorn runs with --proxy-headers; this is what tells it the original
+        # request was HTTPS, so generated URLs do not downgrade to http://.
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # The first request for an uncached model downloads weights and then
+        # computes a UMAP projection, which the app allows up to
+        # MODEL_LOAD_TIMEOUT_SECONDS (300) to finish. nginx defaults to a 60s
+        # read timeout, which would sever that request and surface as a
+        # confusing 504 well before the backend gave up. Keep this at or above
+        # the application timeout.
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+
+    # Projection payloads are large, highly compressible JSON.
+    gzip on;
+    gzip_proxied any;
+    gzip_min_length 1000;
+    gzip_types application/json application/javascript text/css text/plain image/svg+xml;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options            "SAMEORIGIN" always;
+    add_header X-Content-Type-Options     "nosniff" always;
+}
