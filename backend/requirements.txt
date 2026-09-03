@@ -1,0 +1,16 @@
+# --- Web framework ---
+fastapi>=0.116,<1.0
+uvicorn[standard]>=0.35,<1.0
+pydantic>=2.7,<3.0
+pydantic-settings>=2.2,<3.0
+
+# --- Numerical / ML ---
+numpy>=1.26,<3.0
+scikit-learn>=1.4,<2.0
+umap-learn>=0.5.6,<1.0
+
+# --- Model loading (Hugging Face) ---
+transformers>=4.55,<5.0
+torch>=2.2,<3.0
+hf_xet
+accelerate

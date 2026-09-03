@@ -1,0 +1,11 @@
+.git
+.idea
+.claude
+.venv
+Notebooks
+**/node_modules
+**/dist
+**/__pycache__
+**/.pytest_cache
+**/.env
+*.log

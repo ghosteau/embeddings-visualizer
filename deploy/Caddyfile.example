@@ -1,0 +1,13 @@
+# Recommended: give the tool its own subdomain and proxy one same-origin service.
+# Point the DNS record for embeddings.mannymcgrail.com at this server first.
+
+embeddings.mannymcgrail.com {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8000
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+    }
+}

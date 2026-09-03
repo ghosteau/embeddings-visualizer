@@ -1,0 +1,24 @@
+services:
+  embeddings-visualizer:
+    build:
+      context: .
+    image: embeddings-visualizer:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      ENVIRONMENT: production
+      MAX_CACHED_MODELS: 1
+      DEFAULT_TOP_N: 6000
+      MODEL_LOAD_TIMEOUT_SECONDS: 300
+      ALLOWED_MODELS: distilgpt2,gpt2,distilbert-base-uncased,bert-base-uncased,roberta-base
+      CORS_ORIGINS: https://embeddings.mannymcgrail.com
+    volumes:
+      - huggingface-cache:/cache/huggingface
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+
+volumes:
+  huggingface-cache:

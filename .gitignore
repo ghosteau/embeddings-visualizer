@@ -1,3 +1,22 @@
-Notebooks/cache
-Notebooks/.ipynb_checkpoints
-Notebooks/umap_3d_top3000_768.npy
+# --- Notebooks (scratch) ---
+Notebooks/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.env
+
+# --- IDE / local tooling ---
+.idea/
+.claude/settings.local.json
+
+# --- Node / frontend ---
+node_modules/
+frontend/dist/
+*.local
+
+# --- OS ---
+.DS_Store
+Thumbs.db
