@@ -39,22 +39,85 @@ def _friendly_hf_error(name: str, exc: Exception, what: str) -> str:
     """Turn a raw Hugging Face exception into a clear, user-facing message.
 
     ``what`` is "tokenizer" or "model" to indicate which stage failed.
+
+    Ordering here matters more than it looks. The Hub appends the same
+    "if you are trying to access a private or gated repo, make sure you are
+    authenticated" boilerplate to *plain 404s* and to failures caused by a
+    stale credential. Matching on those words first would report a public,
+    existing model as "gated" and send the caller off to request access they
+    do not need. So we branch on ``huggingface_hub``'s typed exceptions where
+    they are available, and only fall back to text matching — with the
+    unambiguous signals tested first — when they are not.
     """
     text = str(exc).lower()
+
     if "trust_remote_code" in text:
         return (
             f"'{name}' ships custom code that must be trusted to run. For safety "
             f"this server only loads standard architectures."
         )
-    if any(s in text for s in ("401", "403", "gated", "authentication", "is not authorized")):
-        return f"'{name}' is private or gated and can't be loaded without credentials."
+
+    # Prefer typed exceptions: they distinguish causes the message text conflates.
+    try:
+        from huggingface_hub.errors import (
+            GatedRepoError,
+            RepositoryNotFoundError,
+        )
+    except ImportError:  # pragma: no cover - older/absent hub package
+        GatedRepoError = RepositoryNotFoundError = ()  # type: ignore[assignment]
+
+    if GatedRepoError and isinstance(exc, GatedRepoError):
+        return (
+            f"'{name}' is a gated repository. Request access on the Hugging Face "
+            f"Hub, then run this server with a token that has been granted it."
+        )
+    if RepositoryNotFoundError and isinstance(exc, RepositoryNotFoundError):
+        return _not_found_message(name)
+
+    # A rejected *credential* is not the same as a gated *model*. Say so, or the
+    # user goes looking for permissions when the real fix is to clear the token.
+    if any(
+        s in text
+        for s in ("signature verification failed", "oauth token", "invalid token", "token is expired")
+    ):
+        return (
+            f"The stored Hugging Face credential was rejected, so '{name}' could not "
+            f"be downloaded. Clear it (`huggingface-cli logout`) to fetch public "
+            f"models anonymously, or sign in again with a valid token."
+        )
+
+    # An architecture newer than the installed transformers is a distinct and
+    # very common failure for freshly-released models. The raw error is a wall
+    # of prose; say plainly that the library is the thing that is out of date.
+    if "does not recognize this architecture" in text or "unrecognized configuration class" in text:
+        import transformers
+
+        return (
+            f"'{name}' uses an architecture that transformers "
+            f"{transformers.__version__} does not know. Upgrade transformers "
+            f"(pip install -U transformers) and try again."
+        )
+
     if any(s in text for s in ("404", "not found", "does not appear", "repository not found")):
-        return f"Model '{name}' was not found on the Hugging Face Hub. Check the id."
+        return _not_found_message(name)
+    if "gated" in text or "is not authorized" in text:
+        return f"'{name}' is private or gated and can't be loaded without credentials."
     if any(s in text for s in ("connection", "offline", "couldn't reach", "timed out", "proxy")):
         return f"Couldn't reach the Hugging Face Hub to download '{name}'. Check your connection."
+
     # Fall back to a trimmed version of the underlying error.
     detail = str(exc).splitlines()[0][:200]
     return f"Could not load the {what} for '{name}': {detail}"
+
+
+def _not_found_message(name: str) -> str:
+    """Message for an id the Hub does not resolve, with a nudge for bare ids."""
+    if "/" not in name:
+        return (
+            f"Model '{name}' was not found on the Hugging Face Hub. Bare ids are "
+            f"legacy aliases; try the canonical 'owner/model' form."
+        )
+    return f"Model '{name}' was not found on the Hugging Face Hub. Check the id."
 
 
 def _extract_input_embeddings(model: object, name: str) -> np.ndarray:
@@ -81,6 +144,67 @@ def _extract_input_embeddings(model: object, name: str) -> np.ndarray:
             f"it can't be visualized."
         )
     return matrix
+
+
+def _humanize_bytes(n: float) -> str:
+    """Format a byte count for a user-facing message.
+
+    Decimal units, matching how the corresponding settings are written, so a
+    configured 6_000_000_000 reads back as "6.0 GB" rather than "5.6 GB".
+    """
+    for unit in ("B", "KB", "MB", "GB"):
+        if abs(n) < 1000 or unit == "GB":
+            return f"{int(n)} B" if unit == "B" else f"{n:.1f} {unit}"
+        n /= 1000
+    return f"{n:.1f} GB"
+
+
+def _preflight(name: str, settings: Settings) -> None:
+    """Reject models the host cannot survive, before downloading any weights.
+
+    ``AutoModel.from_pretrained`` fetches every shard before we ever reach the
+    embedding table, so a public deployment that accepts arbitrary Hub ids can
+    be made to fill its disk by a single request. Both ceilings are therefore
+    checked against Hub *metadata* first — config.json is a few kilobytes, and
+    file sizes come from the repo listing.
+
+    Network failures here are deliberately not fatal: the real load follows
+    immediately and will surface a precise error of its own. This gate exists
+    to stop the pathological cases, not to add a second point of failure.
+    """
+    from huggingface_hub import model_info
+
+    try:
+        info = model_info(name, files_metadata=True)
+    except Exception:
+        return  # let the real load report the failure
+
+    # 1. Total weight download, guarding disk and bandwidth.
+    weight_bytes = sum(
+        sibling.size or 0
+        for sibling in (info.siblings or [])
+        if sibling.rfilename.endswith((".safetensors", ".bin", ".pt", ".h5"))
+    )
+    if weight_bytes > settings.max_download_bytes:
+        raise ModelLoadError(
+            f"'{name}' would download {_humanize_bytes(weight_bytes)} of weights, "
+            f"over this server's {_humanize_bytes(settings.max_download_bytes)} limit. "
+            f"Try a smaller model."
+        )
+
+    # 2. Embedding matrix, guarding the memory we actually hold resident.
+    config = getattr(info, "config", None) or {}
+    vocab = config.get("vocab_size")
+    hidden = config.get("hidden_size") or config.get("n_embd") or config.get("d_model")
+    if isinstance(vocab, int) and isinstance(hidden, int):
+        params = vocab * hidden
+        if params > settings.max_embedding_params:
+            raise ModelLoadError(
+                f"'{name}' has a {vocab:,} x {hidden:,} embedding table "
+                f"({params / 1e6:.0f}M parameters, ~{params * 4 / 1e9:.1f} GB in memory), "
+                f"over this server's {settings.max_embedding_params / 1e6:.0f}M limit. "
+                f"Try a smaller model."
+            )
 
 
 class _ModelSlot:
@@ -202,6 +326,9 @@ class ModelManager:
         from transformers import AutoModel, AutoTokenizer
 
         name = slot.name
+        slot.progress = "Checking model size…"
+        _preflight(name, self._settings)
+
         slot.progress = "Downloading tokenizer…"
         try:
             tokenizer = AutoTokenizer.from_pretrained(name, trust_remote_code=False)

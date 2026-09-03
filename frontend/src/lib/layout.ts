@@ -1,7 +1,7 @@
-/**
+﻿/**
  * Geometry helpers for laying out the projected token cloud.
  *
- * UMAP output lives in an arbitrary coordinate range, so we normalise it into a
+ * UMAP output lives in an arbitrary coordinate range, so we normalize it into a
  * fixed, centered cube. Computing this once (in the store, when a projection
  * arrives) lets both the point cloud and the camera rig share identical
  * coordinates without recomputing.
@@ -9,7 +9,7 @@
 
 const RADIUS = 11;
 
-/** Normalise raw projection coordinates into a centered cube of fixed radius. */
+/** Normalize raw projection coordinates into a centered cube of fixed radius. */
 export function normalizeCoordinates(coordinates: number[][]): Float32Array {
   const n = coordinates.length;
   const out = new Float32Array(n * 3);

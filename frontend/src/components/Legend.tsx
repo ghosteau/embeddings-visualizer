@@ -1,4 +1,4 @@
-/** Projection legend and client-side dataset export. */
+﻿/** Projection legend and client-side dataset export. */
 
 import { useStore } from "../store/useStore";
 import { TOKEN_COLORS, TOKEN_TYPE_LABELS } from "../lib/tokenColors";
@@ -53,7 +53,7 @@ export function Legend() {
         <div>
           <div className="eyebrow">PROJECTION / ACTIVE</div>
           <div className="mt-1 font-mono text-[11px] text-muted">
-            {displayCount.toLocaleString()} visible / {vizData.tokens.length.toLocaleString()} analysed
+            {displayCount.toLocaleString()} visible / {vizData.tokens.length.toLocaleString()} analyzed
           </div>
         </div>
         <button className="text-link text-[11px]" onClick={exportProjection}>
@@ -75,7 +75,7 @@ export function Legend() {
 
       <div className="mt-3 border-t border-line pt-2 font-mono text-[10px] leading-relaxed text-faint">
         {vocab ? `${vocab.toLocaleString()} vocabulary / ` : ""}
-        {vizData.statistics.original_dimension}D → {vizData.statistics.reduced_dimension}D / UMAP {vizData.config.metric}
+        {vizData.statistics.original_dimension}D â†’ {vizData.statistics.reduced_dimension}D / UMAP {vizData.config.metric}
       </div>
     </div>
   );

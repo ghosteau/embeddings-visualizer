@@ -13,12 +13,20 @@ services:
       MODEL_LOAD_TIMEOUT_SECONDS: 300
       ALLOWED_MODELS: distilgpt2,gpt2,distilbert-base-uncased,bert-base-uncased,roberta-base
       CORS_ORIGINS: https://embeddings.mannymcgrail.com
+      # Sized for a small shared host. Lower than the code defaults so a request
+      # is refused rather than the box swapping itself to death.
+      MAX_EMBEDDING_PARAMS: 60000000
+      MAX_DOWNLOAD_BYTES: 2000000000
     volumes:
       - huggingface-cache:/cache/huggingface
     deploy:
       resources:
         limits:
-          memory: 8G
+          # Must sit below free RAM, not above it: a limit larger than the host
+          # has means Docker never intervenes and the kernel OOM-killer picks a
+          # victim instead -- which could be nginx or the portfolio site. On a
+          # 2 GB droplet already running those, ~1.2 GB leaves working room.
+          memory: 1200M
 
 volumes:
   huggingface-cache:

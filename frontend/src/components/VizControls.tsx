@@ -1,4 +1,4 @@
-/** UMAP projection controls; re-projects on demand once a model is loaded. */
+﻿/** UMAP projection controls; re-projects on demand once a model is loaded. */
 
 import { useStore } from "../store/useStore";
 import { Field, SegToggle, Slider } from "./ui";
@@ -78,10 +78,10 @@ export function VizControls() {
         disabled={disabled}
         onClick={() => void regenerate().catch(() => undefined)}
       >
-        {loadState === "visualizing" ? "Computing…" : dirty ? "Apply projection" : "Recompute"}
+        {loadState === "visualizing" ? "Computingâ€¦" : dirty ? "Apply projection" : "Recompute"}
       </button>
 
-      {/* Visible-points is a purely client-side declutter — no re-projection.
+      {/* Visible-points is a purely client-side declutter â€” no re-projection.
           The full projection is always retained so any token can still be
           searched, inspected, and compared. */}
       {totalPoints > 0 && (
@@ -101,7 +101,7 @@ export function VizControls() {
 
       <p className="help-copy">
         Projection controls change the spatial layout. Visible points only changes rendering and
-        keeps every analysed token searchable.
+        keeps every analyzed token searchable.
       </p>
     </div>
   );

@@ -1,9 +1,9 @@
-/**
+﻿/**
  * Typed client for the Embeddings Visualizer backend.
  *
  * Every query endpoint is model-keyed (the backend has no notion of a single
  * "current model"), so most calls take the model id and forward it as a `model`
- * query parameter. Errors are normalised into {@link ApiError} so the UI can
+ * query parameter. Errors are normalized into {@link ApiError} so the UI can
  * surface the backend's `detail` message verbatim.
  */
 

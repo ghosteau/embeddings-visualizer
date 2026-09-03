@@ -80,6 +80,24 @@ class Settings(BaseSettings):
     # Cap on the number of cached UMAP projections (keyed by config) per model.
     max_cached_projections: int = Field(default=8, ge=1, le=64)
 
+    # ------------------------------------------------------------- Preflight --
+    # A public deployment accepts arbitrary Hugging Face ids, so a visitor can
+    # name a model far larger than the host can survive. These two ceilings are
+    # checked against the Hub's metadata *before* a single weight byte is
+    # downloaded, turning "fill the disk, then OOM" into an immediate, clear
+    # rejection. Both are generous for the text models this tool is built for:
+    # the largest preset (gpt2-medium) has a 51M-parameter embedding table and
+    # a ~1.5 GB download.
+    #
+    # Embedding rows x columns. 250M params is ~1 GB as float32, which is the
+    # matrix we actually keep resident.
+    max_embedding_params: int = Field(default=250_000_000, ge=1_000_000)
+
+    # Total size of the repository's weight files. Guards disk and bandwidth,
+    # which the embedding ceiling alone does not: a sharded 600 GB checkpoint
+    # can carry a perfectly ordinary embedding table.
+    max_download_bytes: int = Field(default=6_000_000_000, ge=100_000_000)
+
     # ---------------------------------------------------------- Allowed models --
     # Optional allow-list. When non-empty, only these Hugging Face model ids may
     # be loaded — important for a public deployment so visitors cannot trigger
