@@ -2,7 +2,7 @@
 fastapi>=0.116,<1.0
 uvicorn[standard]>=0.35,<1.0
 pydantic>=2.7,<3.0
-pydantic-settings>=2.2,<3.0
+pydantic-settings>=2.3,<3.0   # 2.3 introduced NoDecode, required by config.py
 
 # --- Numerical / ML ---
 numpy>=1.26,<3.0
