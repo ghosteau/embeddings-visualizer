@@ -22,7 +22,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 COPY backend/requirements.txt ./requirements.txt
+# torch resolves to the CUDA build on default PyPI, dragging in ~2.5 GB of
+# NVIDIA wheels that a GPU-less host can never use. Install it from PyTorch's
+# CPU index first; the requirements install below then sees it satisfied and
+# leaves it alone. This is the difference between a ~250 MB and a ~3 GB image.
 RUN pip install --upgrade pip \
+    && pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.2,<3.0" \
     && pip install -r requirements.txt \
     && useradd --create-home --uid 10001 appuser \
     && mkdir -p /cache/huggingface /app/static \
