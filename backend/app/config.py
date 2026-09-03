@@ -7,11 +7,13 @@ See ``.env.example`` for the full list of knobs and their defaults.
 
 from __future__ import annotations
 
+import json
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -50,7 +52,13 @@ class Settings(BaseSettings):
 
     # CORS: comma-separated list of allowed origins. Defaults to the common
     # Vite dev-server origins. In production set this to your real frontend URL.
-    cors_origins: list[str] = Field(
+    # NoDecode is load-bearing: without it pydantic-settings treats a list
+    # field as "complex" and JSON-decodes the environment value inside the
+    # settings source, which runs *before* field validators. A comma-separated
+    # value is not JSON, so startup died with an opaque SettingsError and the
+    # _split_csv validator below never ran. NoDecode hands the raw string to
+    # the validator instead.
+    cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: [
             "http://localhost:5173",
             "http://127.0.0.1:5173",
@@ -102,19 +110,31 @@ class Settings(BaseSettings):
     # Optional allow-list. When non-empty, only these Hugging Face model ids may
     # be loaded — important for a public deployment so visitors cannot trigger
     # arbitrary multi-gigabyte downloads. Empty list = allow any model.
-    allowed_models: list[str] = Field(default_factory=list)
+    allowed_models: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
     @field_validator("cors_origins", "allowed_models", mode="before")
     @classmethod
     def _split_csv(cls, value: object) -> object:
-        """Allow these list fields to be supplied as a comma-separated string.
+        """Parse these list fields from a single environment string.
 
-        ``pydantic-settings`` reads env vars as strings; this lets
-        ``CORS_ORIGINS="https://a.com,https://b.com"`` work as expected.
+        Comma-separated is the documented form, so ``CORS_ORIGINS="https://a.com,
+        https://b.com"`` works as expected. A JSON array is also accepted:
+        that is what pydantic-settings itself parsed before these fields were
+        marked ``NoDecode``, and silently rejecting it would break any
+        deployment already written that way.
         """
-        if isinstance(value, str):
-            return [item.strip() for item in value.split(",") if item.strip()]
-        return value
+        if not isinstance(value, str):
+            return value
+
+        text = value.strip()
+        if text.startswith("["):
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                # Fall through: a malformed array is reported far more clearly
+                # by the list-of-str validation than by a JSON error here.
+                pass
+        return [item.strip() for item in text.split(",") if item.strip()]
 
     @field_validator("static_dir", mode="before")
     @classmethod
