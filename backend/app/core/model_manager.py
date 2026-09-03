@@ -39,22 +39,73 @@ def _friendly_hf_error(name: str, exc: Exception, what: str) -> str:
     """Turn a raw Hugging Face exception into a clear, user-facing message.
 
     ``what`` is "tokenizer" or "model" to indicate which stage failed.
+
+    Ordering here matters more than it looks. The Hub appends the same
+    "if you are trying to access a private or gated repo, make sure you are
+    authenticated" boilerplate to *plain 404s* and to failures caused by a
+    stale credential. Matching on those words first would report a public,
+    existing model as "gated" and send the caller off to request access they
+    do not need. So we branch on ``huggingface_hub``'s typed exceptions where
+    they are available, and only fall back to text matching — with the
+    unambiguous signals tested first — when they are not.
     """
     text = str(exc).lower()
+
     if "trust_remote_code" in text:
         return (
             f"'{name}' ships custom code that must be trusted to run. For safety "
             f"this server only loads standard architectures."
         )
-    if any(s in text for s in ("401", "403", "gated", "authentication", "is not authorized")):
-        return f"'{name}' is private or gated and can't be loaded without credentials."
+
+    # Prefer typed exceptions: they distinguish causes the message text conflates.
+    try:
+        from huggingface_hub.errors import (
+            GatedRepoError,
+            RepositoryNotFoundError,
+        )
+    except ImportError:  # pragma: no cover - older/absent hub package
+        GatedRepoError = RepositoryNotFoundError = ()  # type: ignore[assignment]
+
+    if GatedRepoError and isinstance(exc, GatedRepoError):
+        return (
+            f"'{name}' is a gated repository. Request access on the Hugging Face "
+            f"Hub, then run this server with a token that has been granted it."
+        )
+    if RepositoryNotFoundError and isinstance(exc, RepositoryNotFoundError):
+        return _not_found_message(name)
+
+    # A rejected *credential* is not the same as a gated *model*. Say so, or the
+    # user goes looking for permissions when the real fix is to clear the token.
+    if any(
+        s in text
+        for s in ("signature verification failed", "oauth token", "invalid token", "token is expired")
+    ):
+        return (
+            f"The stored Hugging Face credential was rejected, so '{name}' could not "
+            f"be downloaded. Clear it (`huggingface-cli logout`) to fetch public "
+            f"models anonymously, or sign in again with a valid token."
+        )
+
     if any(s in text for s in ("404", "not found", "does not appear", "repository not found")):
-        return f"Model '{name}' was not found on the Hugging Face Hub. Check the id."
+        return _not_found_message(name)
+    if "gated" in text or "is not authorized" in text:
+        return f"'{name}' is private or gated and can't be loaded without credentials."
     if any(s in text for s in ("connection", "offline", "couldn't reach", "timed out", "proxy")):
         return f"Couldn't reach the Hugging Face Hub to download '{name}'. Check your connection."
+
     # Fall back to a trimmed version of the underlying error.
     detail = str(exc).splitlines()[0][:200]
     return f"Could not load the {what} for '{name}': {detail}"
+
+
+def _not_found_message(name: str) -> str:
+    """Message for an id the Hub does not resolve, with a nudge for bare ids."""
+    if "/" not in name:
+        return (
+            f"Model '{name}' was not found on the Hugging Face Hub. Bare ids are "
+            f"legacy aliases; try the canonical 'owner/model' form."
+        )
+    return f"Model '{name}' was not found on the Hugging Face Hub. Check the id."
 
 
 def _extract_input_embeddings(model: object, name: str) -> np.ndarray:
