@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Geometry helpers for laying out the projected token cloud.
  *
  * UMAP output lives in an arbitrary coordinate range, so we normalize it into a

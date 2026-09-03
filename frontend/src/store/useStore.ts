@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Central application state (Zustand).
  *
  * Holds the model-loading lifecycle, the active visualization payload, the
@@ -161,7 +161,7 @@ export const useStore = create<AppState>((set, get) => ({
     const model = get().selectedModelId.trim();
     if (!model) return;
 
-    set({ loadState: "loading", loadProgress: "Requesting modelâ€¦", comparison: null });
+    set({ loadState: "loading", loadProgress: "Requesting model…", comparison: null });
 
     // Poll the status endpoint for live progress while /load runs server-side.
     // The load happens in a worker thread, so the event loop keeps serving
@@ -186,7 +186,7 @@ export const useStore = create<AppState>((set, get) => ({
       set({
         loadedModel: model,
         loadState: "visualizing",
-        loadProgress: "Projecting embeddingsâ€¦ (first projection can take ~30s)",
+        loadProgress: "Projecting embeddings… (first projection can take ~30s)",
         accentGlowHex: theme.glowHex,
         themeLabel: theme.label,
       });
@@ -197,7 +197,7 @@ export const useStore = create<AppState>((set, get) => ({
         .then((statistics) => set({ statistics }))
         .catch(() => undefined);
       set({ loadState: "ready" });
-      get().pushToast("success", `${model} loaded â€” ${get().vizData?.tokens.length ?? 0} tokens projected.`);
+      get().pushToast("success", `${model} loaded — ${get().vizData?.tokens.length ?? 0} tokens projected.`);
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : "Failed to load model";
       set({ loadState: "error", loadProgress: msg });
@@ -211,7 +211,7 @@ export const useStore = create<AppState>((set, get) => ({
     const model = get().loadedModel;
     if (!model) return;
     const wasReady = get().loadState === "ready";
-    if (wasReady) set({ loadState: "visualizing", loadProgress: "Re-projectingâ€¦" });
+    if (wasReady) set({ loadState: "visualizing", loadProgress: "Re-projecting…" });
     try {
       const vizData = await api.createVisualization(model, get().config);
       set({
@@ -253,7 +253,7 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
-  // Select a token AND fly the camera to it â€” used when inspecting a token that
+  // Select a token AND fly the camera to it — used when inspecting a token that
   // may be off-screen (e.g. chosen from search or comparison results).
   focusOn: async (index) => {
     set({ focus: { index, nonce: ++focusSeq } });

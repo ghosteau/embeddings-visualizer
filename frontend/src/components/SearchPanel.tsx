@@ -1,4 +1,4 @@
-﻿/** Debounced token lookup across the complete analyzed vocabulary subset. */
+/** Debounced token lookup across the complete analyzed vocabulary subset. */
 
 import { useEffect, useState } from "react";
 import { formatToken } from "../lib/tokenFormat";

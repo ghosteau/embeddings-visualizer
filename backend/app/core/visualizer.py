@@ -1,16 +1,16 @@
-﻿"""Embedding analysis: the :class:`LoadedModel` value object.
+"""Embedding analysis: the :class:`LoadedModel` value object.
 
 A :class:`LoadedModel` is an immutable-after-construction snapshot of one
 transformer's token embedding space, together with derived metadata and an
 LRU cache of UMAP projections. All of the geometric queries the API exposes
 (neighbors, comparisons, search, statistics) are methods here, operating purely
-on NumPy arrays â€” there is no global state and no HTTP awareness, which makes
+on NumPy arrays — there is no global state and no HTTP awareness, which makes
 the maths trivial to unit-test and safe to share across concurrent requests.
 
 The split of responsibilities is deliberate:
 
-* :class:`LoadedModel` â€” *what* we know about an already-loaded model.
-* :class:`~app.core.model_manager.ModelManager` â€” *when* models are loaded,
+* :class:`LoadedModel` — *what* we know about an already-loaded model.
+* :class:`~app.core.model_manager.ModelManager` — *when* models are loaded,
   cached, and evicted.
 """
 
@@ -68,7 +68,7 @@ class LoadedModel:
     ) -> None:
         self.name = name
         # Record the full-vocabulary dimensions for reporting, but only retain
-        # the analyzed subset below â€” holding the entire embedding matrix as
+        # the analyzed subset below — holding the entire embedding matrix as
         # well would roughly double memory for large models.
         self.vocabulary_size = int(embeddings.shape[0])
         self.embedding_dimension = int(embeddings.shape[1])
