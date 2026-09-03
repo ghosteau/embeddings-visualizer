@@ -1,11 +1,11 @@
-﻿/**
+/**
  * The interactive token point cloud.
  *
  * Renders the visible tokens as a single GPU-friendly THREE.Points object (one
  * draw call). Normalized coordinates are shared via the store so the camera rig
  * uses identical positions. Hover/click use r3f's points raycasting
  * (`event.index`). The current selection and its neighbors are emphasised with
- * an overlay that reads from the *full* position buffer â€” so a token can be
+ * an overlay that reads from the *full* position buffer — so a token can be
  * highlighted even when it sits outside the visible-points cutoff.
  */
 
