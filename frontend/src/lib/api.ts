@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Typed client for the Embeddings Visualizer backend.
  *
  * Every query endpoint is model-keyed (the backend has no notion of a single

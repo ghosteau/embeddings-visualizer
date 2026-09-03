@@ -12,6 +12,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  encoding:
+    name: Text encoding
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Cheap, and catches a corruption that is invisible to the compiler and
+      # the test suite: double-encoded UTF-8 still parses fine and only shows
+      # up as garbage characters in the rendered UI.
+      - run: python scripts/check_encoding.py
+
   backend:
     name: Backend (pytest)
     runs-on: ubuntu-latest
